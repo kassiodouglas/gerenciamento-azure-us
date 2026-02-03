@@ -1,6 +1,7 @@
 import { Component, input, signal, inject, computed, effect, Injector, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { trigger, transition, style, animate } from '@angular/animations';
 import { WorkItem, GeneratedTask } from '../types';
 import { marked } from 'marked';
 import { GeminiService } from '../services/gemini.service';
@@ -9,8 +10,16 @@ import { AzureService } from '../services/azure.service';
 @Component({
   selector: 'app-detail-view',
   imports: [CommonModule, FormsModule],
+  animations: [
+    trigger('fadeInSlideIn', [
+      transition(':enter, * => *', [
+        style({ opacity: 0, transform: 'translateY(10px)' }),
+        animate('300ms ease-out', style({ opacity: 1, transform: 'translateY(0)' }))
+      ])
+    ])
+  ],
   template: `
-    <div class="h-full flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden dark:bg-slate-800 dark:border-slate-700">
+    <div [@fadeInSlideIn]="workItem().id" class="h-full flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden dark:bg-slate-800 dark:border-slate-700">
       <!-- Header -->
       <div class="p-6 border-b border-gray-100 flex justify-between items-start dark:border-slate-700">
         <div class="flex-1">
@@ -121,14 +130,27 @@ import { AzureService } from '../services/azure.service';
                 <h3 class="text-lg font-bold text-gray-900 dark:text-slate-100">Tasks</h3>
               </div>
               <span class="px-2 py-0.5 text-xs font-bold bg-gray-200 text-gray-600 rounded-full dark:bg-slate-700 dark:text-slate-400">
-                {{ realTasks().length }}
+                {{ filteredTasks().length }}
               </span>
             </div>
 
             <div [class.hidden]="!isRealTasksVisible()" class="space-y-3">
-              @if (realTasks().length > 0) {
+              <!-- Task Status Filters -->
+              <div class="flex flex-wrap gap-1 mb-4">
+                @for (status of taskStatusOptions; track status) {
+                  <button (click)="toggleTaskStatusFilter(status)"
+                          [class]="'text-[9px] px-2 py-0.5 rounded-full border transition-all ' + 
+                                   (taskStatusFilters().includes(status) 
+                                    ? 'bg-blue-600 border-blue-600 text-white shadow-sm' 
+                                    : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:border-blue-300')">
+                    {{ status }}
+                  </button>
+                }
+              </div>
+
+              @if (filteredTasks().length > 0) {
               <div class="space-y-3">
-                @for (task of realTasks(); track task.id) {
+                @for (task of filteredTasks(); track task.id) {
                   <div (click)="openTaskModal(task)" class="p-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-blue-300 transition-colors cursor-pointer group dark:bg-slate-800 dark:border-slate-700 dark:hover:border-blue-500">
                     <div class="flex justify-between items-start mb-2">
                       <div class="flex items-center gap-2">
@@ -421,6 +443,29 @@ export class DetailViewComponent {
   dailyUSId = signal<number>(0);
   dailyReports = signal<{ us: WorkItem, hours: number, notes: string }[]>([]);
 
+  taskStatusFilters = signal<string[]>(['em desenvolvimento', 'testes', 'revisão', 'para fazer', 'novo', 'ativo']);
+  taskStatusOptions = ['para fazer', 'em desenvolvimento', 'revisão', 'testes', 'resolvido', 'fechado', 'novo', 'ativo'];
+
+  filteredTasks = computed(() => {
+    const filters = this.taskStatusFilters();
+    if (filters.length === 0) return this.realTasks();
+
+    return this.realTasks().filter(task => {
+      const state = task.fields['System.State'].toLowerCase();
+      return filters.some(f => {
+        if (f === 'para fazer') return state === 'new' || state === 'to do' || state === 'para fazer';
+        if (f === 'em desenvolvimento') return state === 'active' || state === 'in progress' || state === 'em desenvolvimento';
+        if (f === 'revisão') return state === 'review' || state === 'revisão';
+        if (f === 'testes') return state === 'testing' || state === 'testes';
+        if (f === 'resolvido') return state === 'resolved' || state === 'resolvido';
+        if (f === 'fechado') return state === 'closed' || state === 'fechado';
+        if (f === 'novo') return state === 'new';
+        if (f === 'ativo') return state === 'active' || state === 'in progress';
+        return state === f;
+      });
+    });
+  });
+
   totalHours = computed(() => {
     return this.realTasks().reduce((acc, t) => acc + (t.fields['Microsoft.VSTS.Scheduling.CompletedWork'] || 0), 0);
   });
@@ -462,6 +507,14 @@ export class DetailViewComponent {
 
   toggleAISuggestions() {
     this.isAISuggestionsVisible.update(v => !v);
+  }
+
+  toggleTaskStatusFilter(status: string) {
+    this.taskStatusFilters.update(current => 
+      current.includes(status) 
+        ? current.filter(s => s !== status)
+        : [...current, status]
+    );
   }
 
   openTaskModal(task: WorkItem) {

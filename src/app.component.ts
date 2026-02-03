@@ -26,6 +26,30 @@ import { CacheService } from './services/cache.service';
           <div class="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center font-bold text-lg">A</div>
           <h1 class="text-lg font-medium tracking-tight">Azure DevOps <span class="text-blue-400">AI Manager</span></h1>
         </div>
+
+        <!-- Dashboard Mini -->
+        <div class="hidden md:flex items-center gap-6 px-4 py-1.5 bg-slate-800/50 rounded-full border border-slate-700/50">
+          <div class="flex flex-col items-center">
+            <span class="text-[10px] text-green-500 dark:text-green-400 uppercase font-bold leading-none">Para Fazer</span>
+            <span class="text-sm font-mono font-bold text-green-500 dark:text-green-400">{{ stats().todo }}</span>
+          </div>
+          <div class="w-px h-4 bg-slate-700"></div>
+          <div class="flex flex-col items-center">
+            <span class="text-[10px] text-blue-400 dark:text-blue-300 uppercase font-bold leading-none">Em Desenvolvimento</span>
+            <span class="text-sm font-mono font-bold text-blue-400 dark:text-blue-300">{{ stats().development }}</span>
+          </div>
+          <div class="w-px h-4 bg-slate-700"></div>
+          <div class="flex flex-col items-center">
+            <span class="text-[10px] text-yellow-400 dark:text-yellow-500 uppercase font-bold leading-none">Testes</span>
+            <span class="text-sm font-mono font-bold text-yellow-400 dark:text-yellow-500">{{ stats().testing }}</span>
+          </div>
+          <div class="w-px h-4 bg-slate-700"></div>
+          <div class="flex flex-col items-center">
+            <span class="text-[10px] text-red-600 dark:text-red-400 uppercase font-bold leading-none">Revisão</span>
+            <span class="text-sm font-mono font-bold text-red-600 dark:text-red-400">{{ stats().review }}</span>
+          </div>
+        </div>
+
         <div class="flex items-center gap-4">
            @if (azure.config().isDemoMode) {
              <span class="px-2 py-1 bg-yellow-600 text-yellow-100 text-xs rounded uppercase font-bold tracking-wider">Demo Mode</span>
@@ -49,7 +73,7 @@ import { CacheService } from './services/cache.service';
              </svg>
            </button>
 
-           <button (click)="dailyTrigger.set(Date.now())" class="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-bold transition-all" title="Gerar Daily">
+           <button (click)="triggerDailyReport()" class="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-bold transition-all" title="Gerar Daily">
              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
              </svg>
@@ -124,8 +148,13 @@ import { CacheService } from './services/cache.service';
                        <span class="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
                          {{ item.fields['Microsoft.VSTS.Scheduling.CompletedWork'] || 0 }}h / {{ item.fields['Microsoft.VSTS.Scheduling.StoryPoints'] || 0 }}pts
                          @let diff = (item.fields['Microsoft.VSTS.Scheduling.StoryPoints'] || 0) - (item.fields['Microsoft.VSTS.Scheduling.CompletedWork'] || 0);
-                         <span [class]="diff < 0 ? 'text-red-500 ml-1' : 'text-gray-400 ml-1'">
-                           ({{ diff < 0 ? 'verificar' : '+' + diff + 'h' }})
+                         <span [class]="diff < 0 ? 'text-red-500 ml-1 flex items-center' : 'text-gray-400 ml-1'">
+                           @if (diff < 0) {
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-yellow-500 mr-0.5" viewBox="0 0 20 20" fill="currentColor">
+                               <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                             </svg>
+                           }
+                           {{ diff < 0 ? '' : '+' + diff + 'h' }}
                          </span>
                        </span>
                      }
@@ -166,6 +195,22 @@ import { CacheService } from './services/cache.service';
       @if (showSettings()) {
         <app-settings (close)="closeSettings()" />
       }
+
+      <!-- Loading Overlay -->
+      @if (isLoading()) {
+        <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center transition-all duration-300">
+          <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border border-slate-200 dark:border-slate-700">
+            <div class="relative w-16 h-16">
+              <div class="absolute inset-0 border-4 border-blue-100 dark:border-blue-900/30 rounded-full"></div>
+              <div class="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+            </div>
+            <div class="flex flex-col items-center">
+              <p class="text-lg font-bold text-slate-800 dark:text-white">Buscando dados...</p>
+              <p class="text-sm text-slate-500 dark:text-slate-400">Sincronizando com Azure DevOps</p>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `
 })
@@ -194,6 +239,29 @@ export class AppComponent {
     });
   });
   selectedStory = signal<WorkItem | null>(null);
+
+  stats = computed(() => {
+    const list = this.stories();
+    let todo = 0;
+    let development = 0;
+    let testing = 0;
+    let review = 0;
+
+    list.forEach(s => {
+      const state = s.fields['System.State'].toLowerCase();
+      if (state === 'new' || state === 'to do' || state === 'para fazer') {
+        todo++;
+      } else if (state === 'active' || state === 'in progress' || state === 'em desenvolvimento') {
+        development++;
+      } else if (state === 'testing' || state === 'testes' || state === 'resolved' || state === 'resolvido') {
+        testing++;
+      } else if (state === 'review' || state === 'revisão') {
+        review++;
+      }
+    });
+
+    return { todo, development, testing, review };
+  });
 
   searchQuery = signal('');
   statusFilters = signal<string[]>(['testes', 'em desenvolvimento', 'revisão', 'para fazer']);
@@ -266,6 +334,13 @@ export class AppComponent {
     const mode = this.isDarkMode() ? 'dark' : 'light';
     localStorage.setItem('theme', mode);
     this.applyTheme(mode);
+  }
+
+  triggerDailyReport() {
+    this.dailyTrigger.set(0);
+    setTimeout(() => {
+      this.dailyTrigger.set(Date.now());
+    }, 10);
   }
 
   private loadTheme(): boolean {

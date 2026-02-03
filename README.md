@@ -3,13 +3,26 @@
 
 O **Azure DevOps AI Manager** é uma aplicação Angular moderna projetada para simplificar o gerenciamento de User Stories no Azure DevOps, integrando inteligência artificial para automatizar tarefas diárias e fornecer insights sobre o progresso do trabalho.
 
-## 🚀 Propósito
+## 🚀 Recursos e Features
 
-Este app foi desenvolvido para desenvolvedores que utilizam o Azure DevOps e desejam uma interface mais ágil e inteligente para:
-- **Visualizar User Stories:** Interface limpa com filtros por status e busca por ID.
-- **Acompanhamento de Horas:** Cálculo automático de horas completadas vs. pontos de história.
-- **Geração de Daily:** Integração com o Google Gemini AI para gerar resumos de Daily Scrum baseados nas suas atividades.
-- **Modo Demo:** Possibilidade de explorar as funcionalidades sem necessidade de configuração imediata.
+### 🔹 Integração com Azure DevOps
+- **Listagem de User Stories:** Visualização clara das User Stories atribuídas ao desenvolvedor.
+- **Busca e Filtros:** Busca por ID e filtros rápidos por status (To Do, In Progress, Review, Testing, etc.).
+- **Detalhamento de Itens:** Visualização completa de descrições e critérios de aceitação com suporte a Markdown.
+- **Gestão de Tasks:** Visualização de sub-tarefas vinculadas, incluindo estado e horas reportadas.
+- **Cálculo de Esforço:** Acompanhamento automático de horas completadas vs. Story Points estimados.
+
+### 🤖 Inteligência Artificial (Google Gemini)
+- **AI Improve:** Refinamento automático da descrição da User Story para torná-la mais clara e profissional.
+- **Resumo IA:** Geração de um resumo executivo conciso da User Story.
+- **Sugestões de Tasks:** IA sugere sub-tarefas técnicas (coding, testing, config) baseadas na descrição da story.
+
+### ⚡ Produtividade e Ferramentas
+- **Gerador de Daily:** Ferramenta interativa para gerar relatórios de Daily Scrum formatados, permitindo consolidar múltiplas demandas, horas do dia e bloqueios.
+- **Gerador de Branch:** Cria e copia automaticamente nomes de branch padronizados (ex: `feature/ID-titulo-da-story`).
+- **Dark Mode:** Suporte completo a tema claro e escuro.
+- **Sistema de Cache:** Interceptor de cache para otimizar o carregamento e reduzir chamadas repetitivas à API.
+- **Modo Demo:** Explore todas as funcionalidades com dados fictícios sem necessidade de configuração.
 
 ## 🛠️ Tecnologias Utilizadas
 
