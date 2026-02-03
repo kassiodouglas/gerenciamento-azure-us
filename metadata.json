@@ -1,0 +1,5 @@
+{
+  "name": "Azure DevOps AI Manager",
+  "description": "Manage Azure DevOps User Stories and Tasks with AI-powered assistance for task generation and refinement.",
+  "requestFramePermissions": []
+}
