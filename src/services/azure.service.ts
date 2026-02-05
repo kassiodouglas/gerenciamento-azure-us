@@ -81,19 +81,23 @@ export class AzureService {
   }
   
     // Real implementation called by component
-    getWorkItemsByIds(ids: number[]): Observable<WorkItem[]> {
-      if (ids.length === 0) return of([]);
-      if (this.config().isDemoMode) return of([]); // Should not happen if mock logic is correct
-  
-      const url = `${this.getBaseUrl()}/workitems?ids=${ids.join(',')}&$expand=all&api-version=7.0`;
-      return this.http.get<{ value: WorkItem[] }>(url, { headers: this.getHeaders() }).pipe(
-        map(r => r.value),
-        catchError(err => {
-          console.error('WorkItem Details Error', err);
-          return of([]);
-        })
-      );
+  getWorkItemsByIds(ids: number[], forceRefresh = false): Observable<WorkItem[]> {
+    if (ids.length === 0) return of([]);
+    if (this.config().isDemoMode) return of([]); // Should not happen if mock logic is correct
+
+    const url = `${this.getBaseUrl()}/workitems?ids=${ids.join(',')}&$expand=all&api-version=7.0`;
+    let headers = this.getHeaders();
+    if (forceRefresh) {
+      headers = headers.set('x-force-refresh', 'true');
     }
+    return this.http.get<{ value: WorkItem[] }>(url, { headers }).pipe(
+      map(r => r.value),
+      catchError(err => {
+        console.error('WorkItem Details Error', err);
+        return of([]);
+      })
+    );
+  }
   
     getWorkItem(id: number, forceRefresh = false): Observable<WorkItem> {
       if (this.config().isDemoMode) {

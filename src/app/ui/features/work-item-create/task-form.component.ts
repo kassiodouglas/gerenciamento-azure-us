@@ -1,4 +1,4 @@
-import { Component, input, output, inject, signal } from '@angular/core';
+import { Component, input, output, inject, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CreateWorkItemUseCase } from '../../../domains/work-item/application/use-cases/create-work-item.use-case';
@@ -87,6 +87,7 @@ import { ModalComponent } from '../../../../components/modal.component';
 })
 export class TaskFormComponent {
   parentStory = input<WorkItem | null>(null);
+  initialData = input<{ title: string, description: string } | null>(null);
   close = output<void>();
   saved = output<WorkItem>();
 
@@ -96,6 +97,16 @@ export class TaskFormComponent {
   description = '';
   isSaving = signal(false);
   errorMessage = signal('');
+
+  constructor() {
+    effect(() => {
+      const data = this.initialData();
+      if (data) {
+        this.title = data.title;
+        this.description = data.description;
+      }
+    });
+  }
 
   save() {
     if (!this.title) return;

@@ -228,6 +228,10 @@ type WorkItem = WorkItemType | WorkItemEntity;
                   <div class="p-3 bg-purple-50/50 border border-purple-100 rounded-lg dark:bg-purple-900/10 dark:border-purple-900/20">
                     <h4 class="text-sm font-semibold text-purple-900 dark:text-purple-300">{{ task.title }}</h4>
                     <p class="text-xs text-purple-700 mt-1 line-clamp-2 dark:text-purple-400/80">{{ task.description }}</p>
+                    <button (click)="createFromSuggestion(task)" class="mt-2 w-full py-1 text-xs font-bold text-purple-700 bg-purple-100 hover:bg-purple-200 rounded transition-colors dark:bg-purple-900/40 dark:text-purple-300 dark:hover:bg-purple-900/60 flex items-center justify-center gap-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                      CRIAR TASK
+                    </button>
                   </div>
                 }
               </div>
@@ -278,7 +282,8 @@ type WorkItem = WorkItemType | WorkItemEntity;
       @if (showCreateTask()) {
         <app-task-form 
           [parentStory]="workItem()" 
-          (close)="showCreateTask.set(false)" 
+          [initialData]="suggestionToCreate()"
+          (close)="closeTaskForm()" 
           (saved)="onTaskCreated($event)" 
         />
       }
@@ -493,6 +498,7 @@ export class DetailViewComponent {
   isSummaryModalOpen = signal(false);
 
   showCreateTask = signal(false);
+  suggestionToCreate = signal<{ title: string, description: string } | null>(null);
   showDailyModal = signal(false);
   dailyHoursToday = 0;
   dailyNotes = '';
@@ -622,7 +628,7 @@ export class DetailViewComponent {
     this.azure.getWorkItem(wi.id, true).subscribe({
       next: (fullItem) => {
         Object.assign(wi, fullItem);
-        this.loadRealTasks(fullItem as any);
+        this.loadRealTasks(fullItem as any, true);
         this.isRefreshingDetails.set(false);
         this.showToast('Dados atualizados!');
       },
@@ -825,7 +831,7 @@ export class DetailViewComponent {
     setTimeout(() => this.toastMessage.set(''), 3000);
   }
 
-  private loadRealTasks(wi: WorkItem) {
+  private loadRealTasks(wi: WorkItem, forceRefresh = false) {
     this.realTasks.set([]);
     if (!wi) return;
     const relations = (wi as WorkItemType).relations || (wi as WorkItemEntity).relations || [];
@@ -838,13 +844,23 @@ export class DetailViewComponent {
       .filter(id => !isNaN(id)) || [];
 
     if (taskIds.length > 0) {
-      this.azure.getWorkItemsByIds(taskIds).subscribe(items => {
+      this.azure.getWorkItemsByIds(taskIds, forceRefresh).subscribe(items => {
         const itemsList = items
           .filter(i => this.getField(i, 'System.WorkItemType') === 'Task' || this.getField(i, 'System.WorkItemType') === 'Bug')
           .sort((a, b) => a.id - b.id);
         this.realTasks.set(itemsList as any);
       });
     }
+  }
+
+  createFromSuggestion(task: GeneratedTask) {
+    this.suggestionToCreate.set({ title: task.title, description: task.description });
+    this.showCreateTask.set(true);
+  }
+
+  closeTaskForm() {
+    this.showCreateTask.set(false);
+    this.suggestionToCreate.set(null);
   }
 
   async generateTasks() {
