@@ -51,7 +51,14 @@ import { ModalComponent } from './modal.component';
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-300">Email/Nome do Desenvolvedor (Custom.Dev)</label>
-            <input type="text" formControlName="devEmail" placeholder="usuario@empresa.com" class="w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100">
+            <input type="text" formControlName="devEmail" placeholder="Nome para filtro (ex: Cassio)" class="w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100">
+            <p class="text-xs text-gray-500 mt-1 dark:text-slate-400">Usado para filtrar as User Stories na lista.</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-300">Email do Usuário (Atribuição)</label>
+            <input type="text" formControlName="userEmail" placeholder="usuario@empresa.com" class="w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100">
+            <p class="text-xs text-gray-500 mt-1 dark:text-slate-400">Se preenchido, será usado para atribuir novas Tasks a você.</p>
           </div>
         }
 
@@ -86,6 +93,7 @@ export class SettingsComponent {
     project: ['', Validators.required],
     pat: ['', Validators.required],
     devEmail: ['', Validators.required],
+    userEmail: [''], // Opcional, usado para System.AssignedTo
     isDemoMode: [false],
     geminiApiKey: ['']
   });
@@ -105,11 +113,13 @@ export class SettingsComponent {
         this.form.controls.project.disable();
         this.form.controls.pat.disable();
         this.form.controls.devEmail.disable();
+        this.form.controls.userEmail.disable();
       } else {
         this.form.controls.organization.enable();
         this.form.controls.project.enable();
         this.form.controls.pat.enable();
         this.form.controls.devEmail.enable();
+        this.form.controls.userEmail.enable();
       }
     });
     
@@ -119,6 +129,7 @@ export class SettingsComponent {
       this.form.controls.project.disable();
       this.form.controls.pat.disable();
       this.form.controls.devEmail.disable();
+      this.form.controls.userEmail.disable();
     }
   }
 
@@ -133,7 +144,8 @@ export class SettingsComponent {
         organization: '',
         project: '',
         pat: '',
-        devEmail: ''
+        devEmail: '',
+        userEmail: ''
       });
     } else if (this.form.valid) {
       this.azure.saveConfig({
@@ -141,7 +153,8 @@ export class SettingsComponent {
         organization: this.form.value.organization!,
         project: this.form.value.project!,
         pat: this.form.value.pat!,
-        devEmail: this.form.value.devEmail!
+        devEmail: this.form.value.devEmail!,
+        userEmail: this.form.value.userEmail || ''
       });
     }
     this.close.emit();

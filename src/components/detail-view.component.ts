@@ -8,13 +8,14 @@ import { marked } from 'marked';
 import { GeminiService } from '../services/gemini.service';
 import { AzureService } from '../services/azure.service';
 import { ModalComponent } from './modal.component';
+import { TaskFormComponent } from '../app/ui/features/work-item-create/task-form.component';
 
 type WorkItem = WorkItemType | WorkItemEntity;
 
 @Component({
   selector: 'app-detail-view',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalComponent],
+  imports: [CommonModule, FormsModule, ModalComponent, TaskFormComponent],
   animations: [
     trigger('fadeInSlideIn', [
       transition(':enter, * => *', [
@@ -137,6 +138,12 @@ type WorkItem = WorkItemType | WorkItemEntity;
               <span class="px-2 py-0.5 text-xs font-bold bg-gray-200 text-gray-600 rounded-full dark:bg-slate-700 dark:text-slate-400">
                 {{ filteredTasks().length }}
               </span>
+              
+              <button (click)="showCreateTask.set(true)" class="ml-auto p-1 text-green-600 hover:bg-green-50 rounded dark:text-green-400 dark:hover:bg-green-900/20" title="Criar Nova Task">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
             </div>
 
             <div [class.hidden]="!isRealTasksVisible()" class="space-y-3">
@@ -265,6 +272,15 @@ type WorkItem = WorkItemType | WorkItemEntity;
             <button (click)="isSummaryModalOpen.set(false)" class="px-6 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors">Fechar</button>
           </div>
         </app-modal>
+      }
+
+      <!-- Create Task Modal -->
+      @if (showCreateTask()) {
+        <app-task-form 
+          [parentStory]="workItem()" 
+          (close)="showCreateTask.set(false)" 
+          (saved)="onTaskCreated($event)" 
+        />
       }
 
       <!-- Daily Modal -->
@@ -476,6 +492,7 @@ export class DetailViewComponent {
   isGeneratingSummary = signal(false);
   isSummaryModalOpen = signal(false);
 
+  showCreateTask = signal(false);
   showDailyModal = signal(false);
   dailyHoursToday = 0;
   dailyNotes = '';
@@ -583,6 +600,11 @@ export class DetailViewComponent {
         ? current.filter(s => s !== status)
         : [...current, status]
     );
+  }
+
+  onTaskCreated(newItem: WorkItem) {
+    this.showToast('Task criada com sucesso!');
+    this.refreshDetails(); // Recarrega para exibir a nova task
   }
 
   openTaskModal(task: WorkItem) {

@@ -8,12 +8,13 @@ import { WorkItem } from './domains/work-item/domain/entities/work-item.entity';
 import { SettingsComponent } from '../components/settings.component';
 import { DetailViewComponent } from '../components/detail-view.component';
 import { KanbanBoardComponent } from './ui/features/dashboard/kanban-board/kanban-board.component';
+import { TaskFormComponent } from './ui/features/work-item-create/task-form.component';
 import { CacheService } from '../services/cache.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, SettingsComponent, DetailViewComponent, FormsModule, KanbanBoardComponent],
+  imports: [CommonModule, SettingsComponent, DetailViewComponent, FormsModule, KanbanBoardComponent, TaskFormComponent],
   template: `
     <div class="h-screen flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       
@@ -85,6 +86,13 @@ import { CacheService } from '../services/cache.service';
              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" [class.animate-spin]="isLoading()" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
              </svg>
+           </button>
+
+           <button (click)="showCreateTask.set(true)" class="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-bold transition-all shadow-sm" title="Criar nova Task">
+             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+             </svg>
+             Task
            </button>
 
            <button (click)="triggerDailyReport()" class="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-bold transition-all" title="Gerar Daily">
@@ -202,6 +210,15 @@ import { CacheService } from '../services/cache.service';
         <app-settings (close)="closeSettings()" />
       }
 
+      <!-- Create Task Modal -->
+      @if (showCreateTask()) {
+        <app-task-form 
+          [parentStory]="selectedStory()" 
+          (close)="showCreateTask.set(false)" 
+          (saved)="onTaskCreated($event)" 
+        />
+      }
+
       <!-- Loading Overlay -->
       @if (isLoading()) {
         <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center transition-all duration-300">
@@ -227,6 +244,7 @@ export class AppComponent {
   cache = inject(CacheService);
   
   showSettings = signal(false);
+  showCreateTask = signal(false);
   isSidebarOpen = signal(true);
   viewMode = signal<'split' | 'board'>('split');
   dailyTrigger = signal<number>(0);
@@ -321,6 +339,16 @@ export class AppComponent {
   closeSettings() {
     this.showSettings.set(false);
     this.refresh();
+  }
+
+  onTaskCreated(newItem: WorkItem) {
+    // Se não tiver parent (US), atualiza a lista principal se for o caso
+    // Como tasks geralmente são filhas, talvez devêssemos atualizar a US pai
+    if (this.selectedStory()) {
+      this.selectStory(this.selectedStory()!); // Refresh da história atual para mostrar a nova task
+    } else {
+      this.refresh(); // Se criada solta, atualiza tudo
+    }
   }
 
   refreshAll() {

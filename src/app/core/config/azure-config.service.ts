@@ -5,6 +5,7 @@ export interface AzureConfig {
   project: string;
   pat: string;
   devEmail: string;
+  userEmail?: string;
   isDemoMode: boolean;
 }
 
@@ -27,6 +28,7 @@ export class AzureConfigService {
       project: '', 
       pat: '', 
       devEmail: '', 
+      userEmail: '',
       isDemoMode: false 
     };
   }

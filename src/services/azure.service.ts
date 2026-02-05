@@ -137,6 +137,52 @@ export class AzureService {
     );
   }
 
+  createWorkItem(type: string, fields: { [key: string]: any }, parentId?: number): Observable<WorkItem> {
+    if (this.config().isDemoMode) {
+      const mockId = Math.floor(Math.random() * 1000) + 200;
+      return of({
+        id: mockId,
+        rev: 1,
+        fields: {
+          'System.Title': fields['System.Title'],
+          'System.WorkItemType': type,
+          'System.State': 'New',
+          ...fields
+        }
+      } as any);
+    }
+
+    const operations = Object.keys(fields).map(key => ({
+      op: 'add',
+      path: `/fields/${key}`,
+      value: fields[key]
+    }));
+
+    if (parentId) {
+      operations.push({
+        op: 'add',
+        path: '/relations/-',
+        value: {
+          rel: 'System.LinkTypes.Hierarchy-Reverse',
+          url: `${this.getBaseUrl()}/workitems/${parentId}`,
+          attributes: {
+            comment: 'Vinculado via AI Manager'
+          }
+        }
+      });
+    }
+
+    const url = `${this.getBaseUrl()}/workitems/$${type}?api-version=7.0`;
+    const headers = this.getHeaders().set('Content-Type', 'application/json-patch+json');
+
+    return this.http.post<WorkItem>(url, operations, { headers }).pipe(
+      catchError(err => {
+        console.error('Create WorkItem Error', err);
+        throw err;
+      })
+    );
+  }
+
   private getMockStories(): WorkItem[] {
     return [
       {

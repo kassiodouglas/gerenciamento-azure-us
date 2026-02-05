@@ -80,6 +80,50 @@ export class AzureWorkItemRepository implements IWorkItemRepository {
     );
   }
 
+  create(type: string, fields: { [key: string]: any }, parentId?: number): Observable<WorkItem> {
+    if (this.configService.isDemoMode()) {
+      const mockId = Math.floor(Math.random() * 1000) + 200;
+      const newWorkItem = new WorkItem(
+        mockId,
+        1,
+        fields['System.Title'],
+        type,
+        'New',
+        fields['System.Description'],
+        undefined,
+        parentId ? [{ rel: 'System.LinkTypes.Hierarchy-Reverse', url: `http://mock/${parentId}` }] : []
+      );
+      return of(newWorkItem);
+    }
+
+    const operations = Object.keys(fields).map(key => ({
+      op: 'add',
+      path: `/fields/${key}`,
+      value: fields[key]
+    }));
+
+    if (parentId) {
+      operations.push({
+        op: 'add',
+        path: '/relations/-',
+        value: {
+          rel: 'System.LinkTypes.Hierarchy-Reverse',
+          url: `${this.configService.getBaseUrl()}/workitems/${parentId}`,
+          attributes: {
+            comment: 'Vinculado via AI Manager'
+          }
+        }
+      });
+    }
+
+    const url = `${this.configService.getBaseUrl()}/workitems/$${type}?api-version=7.0`;
+    const headers = this.getHeaders().set('Content-Type', 'application/json-patch+json');
+
+    return this.http.post(url, operations, { headers }).pipe(
+      map(response => WorkItemMapper.toDomain(response))
+    );
+  }
+
   private getMockStories(): WorkItem[] {
     return [
       new WorkItem(101, 1, 'Integrar API do Google Gemini', 'User Story', 'Ativo', 'Desc...', 'AC...'),
