@@ -32,8 +32,9 @@ export class AzureConfigService {
   }
 
   saveConfig(newConfig: AzureConfig) {
+    console.log('Saving config:', newConfig);
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(newConfig));
-    this.configSignal.set(newConfig);
+    this.configSignal.set({...newConfig});
   }
 
   getAuthorizationHeader(): string {
@@ -43,6 +44,8 @@ export class AzureConfigService {
 
   getBaseUrl(): string {
     const conf = this.configSignal();
-    return `https://dev.azure.com/${conf.organization}/${conf.project}/_apis/wit`;
+    const url = `https://dev.azure.com/${conf.organization}/${conf.project}/_apis/wit`;
+    console.log('Base URL requested:', url);
+    return url;
   }
 }

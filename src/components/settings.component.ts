@@ -2,6 +2,7 @@ import { Component, inject, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { AzureService } from '../services/azure.service';
+import { GeminiConfigService } from '../app/core/config/gemini-config.service';
 import { ModalComponent } from './modal.component';
 
 @Component({
@@ -54,6 +55,14 @@ import { ModalComponent } from './modal.component';
           </div>
         }
 
+        <div class="border-t border-gray-200 dark:border-slate-700 pt-4 mt-4">
+          <h4 class="text-sm font-bold text-gray-900 dark:text-slate-100 mb-2">Gemini AI</h4>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1 dark:text-slate-300">Gemini API Key</label>
+            <input type="password" formControlName="geminiApiKey" placeholder="Sua Gemini API Key" class="w-full rounded-md border-gray-300 shadow-sm border p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100">
+          </div>
+        </div>
+
         <div footer class="flex justify-end">
           <button type="button" (click)="close.emit()" class="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600 dark:hover:bg-slate-600">
             Cancelar
@@ -68,6 +77,7 @@ import { ModalComponent } from './modal.component';
 })
 export class SettingsComponent {
   azure = inject(AzureService);
+  geminiConfig = inject(GeminiConfigService);
   fb = inject(FormBuilder);
   close = output<void>();
 
@@ -76,12 +86,17 @@ export class SettingsComponent {
     project: ['', Validators.required],
     pat: ['', Validators.required],
     devEmail: ['', Validators.required],
-    isDemoMode: [false]
+    isDemoMode: [false],
+    geminiApiKey: ['']
   });
 
   constructor() {
     const conf = this.azure.config();
-    this.form.patchValue(conf);
+    const gemini = this.geminiConfig.config();
+    this.form.patchValue({
+      ...conf,
+      geminiApiKey: gemini.apiKey
+    });
     
     // Disable validators if demo mode is on
     this.form.controls.isDemoMode.valueChanges.subscribe(val => {
@@ -108,6 +123,10 @@ export class SettingsComponent {
   }
 
   save() {
+    this.geminiConfig.saveConfig({
+      apiKey: this.form.value.geminiApiKey || ''
+    });
+
     if (this.form.value.isDemoMode) {
       this.azure.saveConfig({
         isDemoMode: true,

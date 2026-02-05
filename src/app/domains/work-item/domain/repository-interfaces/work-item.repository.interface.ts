@@ -7,6 +7,7 @@ export interface IWorkItemRepository {
   getByIds(ids: number[]): Observable<WorkItem[]>;
   search(query: string): Observable<WorkItem[]>;
   searchByDevEmail(email: string): Observable<WorkItem[]>;
+  update(id: number, operations: { op: string, path: string, value: any }[]): Observable<WorkItem>;
 }
 
 export const WORK_ITEM_REPOSITORY_TOKEN = new InjectionToken<IWorkItemRepository>('IWorkItemRepository');

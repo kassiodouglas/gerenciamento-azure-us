@@ -156,8 +156,13 @@ type WorkItem = WorkItemType | WorkItemEntity;
               @if (filteredTasks().length > 0) {
               <div class="space-y-3">
                 @for (task of filteredTasks(); track task.id) {
-                  <div (click)="openTaskModal(task)" [class]="'p-3 border rounded-lg shadow-sm transition-colors cursor-pointer group dark:bg-slate-800 dark:border-slate-700 dark:hover:border-blue-500 ' + (getField(task, 'System.WorkItemType') === 'Bug' ? 'bg-red-50/30 border-red-100 hover:border-red-300' : 'bg-white border-gray-200 hover:border-blue-300')">
-                    <div class="flex justify-between items-start mb-2">
+                  <div (click)="openTaskModal(task)" [class]="'p-3 border rounded-lg shadow-sm transition-colors cursor-pointer group dark:bg-slate-800 dark:border-slate-700 dark:hover:border-blue-500 relative ' + (getField(task, 'System.WorkItemType') === 'Bug' ? 'bg-red-50/30 border-red-100 hover:border-red-300' : 'bg-white border-gray-200 hover:border-blue-300')">
+                    <button (click)="$event.stopPropagation(); openEditModal(task)" class="absolute top-2 right-2 p-1 text-slate-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <div class="flex justify-between items-start mb-2 pr-6">
                       <div class="flex items-center gap-2">
                         <span [class]="'text-[9px] font-bold px-1 rounded uppercase ' + (getField(task, 'System.WorkItemType') === 'Bug' ? 'bg-red-600 text-white' : 'bg-slate-600 text-white')">
                           {{ getField(task, 'System.WorkItemType') }}
@@ -239,23 +244,25 @@ type WorkItem = WorkItemType | WorkItemEntity;
       }
 
       <!-- AI Summary Modal -->
-      @if (summaryContent()) {
+      @if (isSummaryModalOpen()) {
         <app-modal title="Resumo IA" 
-                   maxWidth="max-w-lg"
+                   maxWidth="max-w-2xl"
                    headerClass="bg-indigo-50 dark:bg-indigo-900/20"
                    titleClass="text-indigo-900 dark:text-indigo-300"
-                   (close)="summaryContent.set('')">
+                   (close)="isSummaryModalOpen.set(false)">
           
           <svg header-icon xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
 
-          <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-slate-300 whitespace-pre-line">
-            {{ summaryContent() }}
+          <div class="max-h-[60vh] overflow-y-auto pr-2">
+            <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-slate-300" 
+                 [innerHTML]="renderMarkdown(summaryContent())">
+            </div>
           </div>
 
           <div footer class="text-right">
-            <button (click)="summaryContent.set('')" class="px-6 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors">Fechar</button>
+            <button (click)="isSummaryModalOpen.set(false)" class="px-6 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors">Fechar</button>
           </div>
         </app-modal>
       }
@@ -335,58 +342,100 @@ type WorkItem = WorkItemType | WorkItemEntity;
         </app-modal>
       }
 
-      <!-- Task Modal -->
+      <!-- Unified Task Modal (View & Edit) -->
       @if (selectedTask()) {
-        <app-modal [title]="getField(selectedTask()!, 'System.Title')"
+        <app-modal [title]="isEditingTask() ? 'Editar Tarefa' : getField(selectedTask()!, 'System.Title')"
                    maxWidth="max-w-2xl"
                    headerClass="bg-slate-50/50 dark:bg-slate-900/20"
                    (close)="closeTaskModal()">
           
           <div header-icon class="flex items-center gap-3">
             <span class="px-2 py-1 text-[10px] font-bold rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">TASK #{{ selectedTask()!.id }}</span>
-            <span [class]="'px-2 py-1 text-[10px] font-bold rounded ' + getStateColor(getField(selectedTask()!, 'System.State') || '')">
-              {{ getField(selectedTask()!, 'System.State') }}
-            </span>
+            @if (!isEditingTask()) {
+              <span [class]="'px-2 py-1 text-[10px] font-bold rounded ' + getStateColor(getField(selectedTask()!, 'System.State') || '')">
+                {{ getField(selectedTask()!, 'System.State') }}
+              </span>
+            }
           </div>
 
-          <div class="space-y-8">
-            @if (getField(selectedTask()!, 'System.Description')) {
+          @if (isEditingTask()) {
+            <div class="space-y-4">
               <div>
-                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Descrição</h3>
-                <div class="prose prose-sm max-w-none text-gray-700 dark:text-slate-300" [innerHTML]="renderMarkdown(getField(selectedTask()!, 'System.Description'))"></div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Título</label>
+                <input type="text" [(ngModel)]="editTaskTitle" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white" />
               </div>
-            }
-
-            <div class="grid grid-cols-2 gap-6 pt-6 border-t border-gray-100 dark:border-slate-700">
-              <div>
-                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Esforço</h3>
-                <div class="flex items-center gap-4">
-                  <div class="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-gray-100 dark:border-slate-700 flex-1">
-                    <span class="block text-[10px] text-gray-500 uppercase">Concluído</span>
-                    <span class="text-lg font-bold text-indigo-600 dark:text-indigo-400">{{ getField(selectedTask()!, 'Microsoft.VSTS.Scheduling.CompletedWork') || 0 }}h</span>
-                  </div>
-                  <div class="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-gray-100 dark:border-slate-700 flex-1">
-                    <span class="block text-[10px] text-gray-500 uppercase">Restante</span>
-                    <span class="text-lg font-bold text-amber-600 dark:text-amber-400">{{ getField(selectedTask()!, 'Microsoft.VSTS.Scheduling.RemainingWork') || 0 }}h</span>
-                  </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Status</label>
+                  <select [(ngModel)]="editTaskState" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white">
+                    @for (opt of taskStatusOptions; track opt) {
+                      <option [value]="opt">{{ opt }}</option>
+                    }
+                  </select>
+                </div>
+                <div>
+                   <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Trabalho Concluído (h)</label>
+                   <input type="number" [(ngModel)]="editTaskCompletedWork" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white" />
                 </div>
               </div>
               <div>
-                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Atribuído a</h3>
-                <div class="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-gray-100 dark:border-slate-700">
-                  <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs">
-                    {{ (getField(selectedTask()!, 'System.AssignedTo')?.displayName || '?')[0] }}
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Descrição</label>
+                <textarea [(ngModel)]="editTaskDesc" rows="5" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white"></textarea>
+              </div>
+            </div>
+          } @else {
+            <div class="space-y-8">
+              @if (getField(selectedTask()!, 'System.Description')) {
+                <div>
+                  <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Descrição</h3>
+                  <div class="prose prose-sm max-w-none text-gray-700 dark:text-slate-300" [innerHTML]="renderMarkdown(getField(selectedTask()!, 'System.Description'))"></div>
+                </div>
+              }
+
+              <div class="grid grid-cols-2 gap-6 pt-6 border-t border-gray-100 dark:border-slate-700">
+                <div>
+                  <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Esforço</h3>
+                  <div class="flex items-center gap-4">
+                    <div class="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-gray-100 dark:border-slate-700 flex-1">
+                      <span class="block text-[10px] text-gray-500 uppercase">Concluído</span>
+                      <span class="text-lg font-bold text-indigo-600 dark:text-indigo-400">{{ getField(selectedTask()!, 'Microsoft.VSTS.Scheduling.CompletedWork') || 0 }}h</span>
+                    </div>
+                    <div class="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-gray-100 dark:border-slate-700 flex-1">
+                      <span class="block text-[10px] text-gray-500 uppercase">Restante</span>
+                      <span class="text-lg font-bold text-amber-600 dark:text-amber-400">{{ getField(selectedTask()!, 'Microsoft.VSTS.Scheduling.RemainingWork') || 0 }}h</span>
+                    </div>
                   </div>
-                  <span class="text-sm font-medium text-gray-700 dark:text-slate-200">{{ getField(selectedTask()!, 'System.AssignedTo')?.displayName || 'Não atribuído' }}</span>
+                </div>
+                <div>
+                  <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Atribuído a</h3>
+                  <div class="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-gray-100 dark:border-slate-700">
+                    <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs">
+                      {{ (getField(selectedTask()!, 'System.AssignedTo')?.displayName || '?')[0] }}
+                    </div>
+                    <span class="text-sm font-medium text-gray-700 dark:text-slate-200">{{ getField(selectedTask()!, 'System.AssignedTo')?.displayName || 'Não atribuído' }}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          }
 
-          <div footer class="text-right">
-            <button (click)="closeTaskModal()" class="px-6 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 text-sm font-bold text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
-              Fechar
-            </button>
+          <div footer class="flex justify-between items-center">
+            @if (!isEditingTask()) {
+              <button (click)="openEditModal(selectedTask()!)" class="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-bold text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                EDITAR TAREFA
+              </button>
+              <button (click)="closeTaskModal()" class="px-6 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 text-sm font-bold text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+                Fechar
+              </button>
+            } @else {
+              <button (click)="isEditingTask.set(false)" class="text-gray-500 hover:text-gray-700 text-sm font-bold">CANCELAR</button>
+              <button (click)="saveTask()" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors">
+                SALVAR ALTERAÇÕES
+              </button>
+            }
           </div>
         </app-modal>
       }
@@ -425,6 +474,7 @@ export class DetailViewComponent {
   toastMessage = signal<string>('');
   summaryContent = signal<string>('');
   isGeneratingSummary = signal(false);
+  isSummaryModalOpen = signal(false);
 
   showDailyModal = signal(false);
   dailyHoursToday = 0;
@@ -481,12 +531,21 @@ export class DetailViewComponent {
     return this.getField(wi, 'Microsoft.VSTS.Scheduling.StoryPoints') || this.getField(wi, 'Microsoft.VSTS.Scheduling.Effort') || 0;
   });
 
+  private lastWorkItemId: number | null = null;
+
   // Reset local state when workItem changes
   constructor() {
     effect(() => {
       const wi = this.workItem();
       if (!wi) return;
-      this.tasks.set([]); 
+      
+      // Só reseta se mudar de US
+      if (this.lastWorkItemId !== wi.id) {
+        this.tasks.set([]); 
+        this.summaryContent.set('');
+        this.lastWorkItemId = wi.id;
+      }
+
       this.isGenerating.set(false);
       this.isRefining.set(false);
       this.generatedBranch.set('');
@@ -555,13 +614,29 @@ export class DetailViewComponent {
   async generateSummary() {
     const wi = this.workItem();
     if (!wi) return;
+
+    if (this.summaryContent()) {
+      this.isSummaryModalOpen.set(true);
+      return;
+    }
+
     const desc = (this.getField(wi, 'System.Description') || '').replace(/<[^>]*>/g, '') || '';
-    if (!desc) return;
+    if (!desc) {
+      this.showToast('US sem descrição para resumir.');
+      return;
+    }
     
     this.isGeneratingSummary.set(true);
-    const summary = await this.gemini.summarizeDescription(desc);
-    this.summaryContent.set(summary);
-    this.isGeneratingSummary.set(false);
+    try {
+      const summary = await this.gemini.summarizeDescription(desc);
+      this.summaryContent.set(summary);
+      this.isSummaryModalOpen.set(true);
+    } catch (error) {
+      console.error('Erro ao gerar resumo:', error);
+      this.showToast('Erro ao gerar resumo.');
+    } finally {
+      this.isGeneratingSummary.set(false);
+    }
   }
 
   generateBranchName() {
@@ -814,5 +889,41 @@ export class DetailViewComponent {
       case 'removed': return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
       default: return 'bg-gray-100 text-gray-800 dark:bg-slate-700 dark:text-slate-300';
     }
+  }
+
+  isEditingTask = signal(false);
+  editTaskTitle = '';
+  editTaskDesc = '';
+  editTaskState = '';
+  editTaskCompletedWork = 0;
+
+  openEditModal(task: WorkItem) {
+    this.selectedTask.set(task);
+    this.editTaskTitle = this.getField(task, 'System.Title');
+    this.editTaskDesc = this.getField(task, 'System.Description');
+    this.editTaskState = this.getField(task, 'System.State');
+    this.editTaskCompletedWork = this.getField(task, 'Microsoft.VSTS.Scheduling.CompletedWork') || 0;
+    this.isEditingTask.set(true);
+  }
+
+  saveTask() {
+    const task = this.selectedTask();
+    if (!task) return;
+
+    const ops = [
+      { op: 'replace', path: '/fields/System.Title', value: this.editTaskTitle },
+      { op: 'replace', path: '/fields/System.Description', value: this.editTaskDesc },
+      { op: 'replace', path: '/fields/System.State', value: this.editTaskState },
+      { op: 'replace', path: '/fields/Microsoft.VSTS.Scheduling.CompletedWork', value: this.editTaskCompletedWork }
+    ];
+
+    this.azure.updateWorkItem(task.id, ops).subscribe({
+      next: (updated) => {
+        this.showToast('Tarefa atualizada!');
+        this.isEditingTask.set(false);
+        this.refreshDetails();
+      },
+      error: () => this.showToast('Erro ao atualizar tarefa')
+    });
   }
 }

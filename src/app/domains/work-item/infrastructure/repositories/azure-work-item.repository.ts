@@ -67,6 +67,19 @@ export class AzureWorkItemRepository implements IWorkItemRepository {
     return this.search(query);
   }
 
+  update(id: number, operations: { op: string, path: string, value: any }[]): Observable<WorkItem> {
+    if (this.configService.isDemoMode()) {
+      return of(this.getMockStories()[0]);
+    }
+
+    const url = `${this.configService.getBaseUrl()}/workitems/${id}?api-version=7.0`;
+    const headers = this.getHeaders().set('Content-Type', 'application/json-patch+json');
+
+    return this.http.patch(url, operations, { headers }).pipe(
+      map(response => WorkItemMapper.toDomain(response))
+    );
+  }
+
   private getMockStories(): WorkItem[] {
     return [
       new WorkItem(101, 1, 'Integrar API do Google Gemini', 'User Story', 'Ativo', 'Desc...', 'AC...'),

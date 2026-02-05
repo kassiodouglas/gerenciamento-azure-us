@@ -1,0 +1,40 @@
+{
+  "name": "azure-devops-ai-manager-desktop",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "app:copy": "rmdir /S /Q resources\\app 2>nul & mkdir resources\\app & xcopy /E /I /Y ..\\dist resources\\app\\",
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dev": "npm run app:copy && npm run start",
+    "build": "npm run app:copy && npm run dist"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Desktop version of Azure DevOps AI Manager",
+  "devDependencies": {
+    "electron": "^39.2.1",
+    "electron-builder": "^26.0.12",
+    "electron-reload": "^2.0.0-alpha.1"
+  },
+  "build": {
+    "appId": "com.azure.devops.ai.manager",
+    "productName": "AzureDevOpsAIManager",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "resources/**/*",
+      "index.js",
+      "renderer.js"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/logo.png"
+    }
+  },
+  "dependencies": {
+    "electron-store": "^6.0.1"
+  }
+}

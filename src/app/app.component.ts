@@ -7,12 +7,13 @@ import { GetWorkItemUseCase } from './domains/work-item/application/use-cases/ge
 import { WorkItem } from './domains/work-item/domain/entities/work-item.entity';
 import { SettingsComponent } from '../components/settings.component';
 import { DetailViewComponent } from '../components/detail-view.component';
+import { KanbanBoardComponent } from './ui/features/dashboard/kanban-board/kanban-board.component';
 import { CacheService } from '../services/cache.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, SettingsComponent, DetailViewComponent, FormsModule],
+  imports: [CommonModule, SettingsComponent, DetailViewComponent, FormsModule, KanbanBoardComponent],
   template: `
     <div class="h-screen flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       
@@ -26,6 +27,18 @@ import { CacheService } from '../services/cache.service';
           </button>
           <div class="w-8 h-8 bg-blue-600 rounded-md flex items-center justify-center font-bold text-lg">A</div>
           <h1 class="text-lg font-medium tracking-tight">Azure DevOps <span class="text-blue-400">AI Manager</span></h1>
+        </div>
+
+        <!-- View Mode Toggle -->
+        <div class="flex items-center gap-2 bg-slate-800/50 p-1 rounded-full border border-slate-700/50">
+          <button (click)="viewMode.set('split')" 
+                  [class]="'px-3 py-1 text-xs font-bold rounded-full transition-colors ' + (viewMode() === 'split' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-700')">
+            Lista
+          </button>
+          <button (click)="viewMode.set('board')"
+                  [class]="'px-3 py-1 text-xs font-bold rounded-full transition-colors ' + (viewMode() === 'board' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-700')">
+            Board
+          </button>
         </div>
 
         <!-- Dashboard Mini -->
@@ -92,95 +105,96 @@ import { CacheService } from '../services/cache.service';
 
       <!-- Main Layout -->
       <div class="flex-1 flex overflow-hidden dark:bg-slate-900">
-        
-        <!-- Sidebar: List -->
-        <aside [class.w-0]="!isSidebarOpen()" [class.opacity-0]="!isSidebarOpen()" [class.w-80]="isSidebarOpen()" class="bg-white border-r border-gray-200 flex flex-col flex-shrink-0 dark:bg-slate-900 dark:border-slate-800 transition-all duration-300 ease-in-out overflow-hidden">
-          <div class="p-4 border-b border-gray-100 flex items-center justify-between dark:border-slate-800">
-            <h2 class="font-semibold text-gray-700 dark:text-slate-200">User Stories</h2>
-            <button (click)="refresh()" [disabled]="isLoading()" class="text-blue-600 hover:text-blue-800 text-sm font-medium dark:text-blue-400 dark:hover:text-blue-300">
-               {{ isLoading() ? 'Carregando...' : 'Atualizar' }}
-            </button>
-          </div>
-          
-      <div class="flex-1 overflow-y-auto p-3 space-y-3">
-        @if (errorMessage()) {
-          <div class="p-3 bg-red-50 text-red-700 text-sm rounded border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30">
-            {{ errorMessage() }}
-            <div class="mt-2 text-xs">Verifique as configurações ou use o Modo Demo.</div>
-          </div>
-        }
-
-        <!-- Search and Filters -->
-        <div class="space-y-2 mb-4">
-          <div class="relative">
-            <input type="text" 
-                   [ngModel]="searchQuery()" 
-                   (ngModelChange)="searchQuery.set($event)"
-                   placeholder="Buscar #ID ou titulo..." 
-                   class="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all dark:text-white" />
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-3 top-2.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-
-          <div class="flex flex-wrap gap-1">
-            @for (status of availableStatus; track status) {
-              <button (click)="toggleStatusFilter(status)"
-                      [class]="'text-[10px] px-2 py-1 rounded-full border transition-all ' + 
-                               (statusFilters().includes(status) 
-                                ? 'bg-blue-600 border-blue-600 text-white shadow-sm' 
-                                : 'bg-gray-50 dark:bg-slate-800 border-gray-100 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:border-blue-300')">
-                {{ status }}
+        @if (viewMode() === 'split') {
+          <!-- Sidebar: List -->
+          <aside [class.w-0]="!isSidebarOpen()" [class.opacity-0]="!isSidebarOpen()" [class.w-80]="isSidebarOpen()" class="bg-white border-r border-gray-200 flex flex-col flex-shrink-0 dark:bg-slate-900 dark:border-slate-800 transition-all duration-300 ease-in-out overflow-hidden">
+            <div class="p-4 border-b border-gray-100 flex items-center justify-between dark:border-slate-800">
+              <h2 class="font-semibold text-gray-700 dark:text-slate-200">User Stories</h2>
+              <button (click)="refresh()" [disabled]="isLoading()" class="text-blue-600 hover:text-blue-800 text-sm font-medium dark:text-blue-400 dark:hover:text-blue-300">
+                {{ isLoading() ? 'Carregando...' : 'Atualizar' }}
               </button>
-            }
-          </div>
-        </div>
-
-        @for (item of filteredStories(); track item.id) {
-              <div (click)="selectStory(item)" 
-                   [class]="'p-3 rounded-lg cursor-pointer border transition-all duration-200 ' + 
-                            (selectedStory()?.id === item.id 
-                              ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-300 shadow-sm dark:bg-blue-900/20 dark:border-blue-800 dark:ring-blue-800' 
-                              : 'bg-white border-gray-100 hover:border-blue-200 hover:bg-gray-50 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-750 dark:hover:border-slate-600')">
-                 <div class="flex justify-between items-start mb-1">
-                   <div class="flex items-center gap-2">
-                     <span class="text-xs font-mono text-gray-500 dark:text-slate-400">#{{ item.id }}</span>
-                   </div>
-                   <span [class]="'text-[10px] uppercase font-bold px-1.5 rounded ' + getStateColor(item.state)">
-                     {{ item.state }}
-                   </span>
-                 </div>
-                 <h3 class="text-sm font-medium text-gray-800 line-clamp-2 leading-snug dark:text-slate-200">{{ item.title }}</h3>
-              </div>
-            } @empty {
-              @if (!isLoading() && !errorMessage()) {
-                <div class="text-center py-10 text-gray-400 text-sm dark:text-slate-500">Nenhuma história encontrada.</div>
-              }
-            }
-          </div>
-        </aside>
-
-        <!-- Main Content: Details -->
-        <main class="flex-1 p-6 bg-slate-50 overflow-hidden dark:bg-slate-900">
-          <div [class.hidden]="!selectedStory() && dailyTrigger() === 0" class="h-full">
-            <app-detail-view [workItem]="selectedStory()" [availableStories]="activeStories()" [triggerDaily]="dailyTrigger()" (closeDaily)="dailyTrigger.set(0)" class="h-full block" />
-          </div>
-
-          @if (!selectedStory() && dailyTrigger() === 0) {
->>>>+++ REPLACE
-
-            <div class="h-full flex flex-col items-center justify-center text-gray-400 dark:text-slate-500">
-
-              <div class="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mb-4 text-gray-400">
-                 <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                 </svg>
-              </div>
-              <p class="text-lg font-medium">Selecione uma User Story para ver os detalhes</p>
-              <p class="text-sm mt-2 max-w-xs text-center">Configure sua conexão nas Configurações para buscar dados reais do Azure DevOps.</p>
             </div>
-          }
-        </main>
+            
+            <div class="flex-1 overflow-y-auto p-3 space-y-3">
+              @if (errorMessage()) {
+                <div class="p-3 bg-red-50 text-red-700 text-sm rounded border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30">
+                  {{ errorMessage() }}
+                  <div class="mt-2 text-xs">Verifique as configurações ou use o Modo Demo.</div>
+                </div>
+              }
+
+              <!-- Search and Filters -->
+              <div class="space-y-2 mb-4">
+                <div class="relative">
+                  <input type="text" 
+                        [ngModel]="searchQuery()" 
+                        (ngModelChange)="searchQuery.set($event)"
+                        placeholder="Buscar #ID ou titulo..." 
+                        class="w-full bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all dark:text-white" />
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-3 top-2.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+
+                <div class="flex flex-wrap gap-1">
+                  @for (status of availableStatus; track status) {
+                    <button (click)="toggleStatusFilter(status)"
+                            [class]="'text-[10px] px-2 py-1 rounded-full border transition-all ' + 
+                                    (statusFilters().includes(status) 
+                                      ? 'bg-blue-600 border-blue-600 text-white shadow-sm' 
+                                      : 'bg-gray-50 dark:bg-slate-800 border-gray-100 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:border-blue-300')">
+                      {{ status }}
+                    </button>
+                  }
+                </div>
+              </div>
+
+              @for (item of filteredStories(); track item.id) {
+                <div (click)="selectStory(item)" 
+                    [class]="'p-3 rounded-lg cursor-pointer border transition-all duration-200 ' + 
+                              (selectedStory()?.id === item.id 
+                                ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-300 shadow-sm dark:bg-blue-900/20 dark:border-blue-800 dark:ring-blue-800' 
+                                : 'bg-white border-gray-100 hover:border-blue-200 hover:bg-gray-50 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-750 dark:hover:border-slate-600')">
+                    <div class="flex justify-between items-start mb-1">
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-mono text-gray-500 dark:text-slate-400">#{{ item.id }}</span>
+                      </div>
+                      <span [class]="'text-[10px] uppercase font-bold px-1.5 rounded ' + getStateColor(item.state)">
+                        {{ item.state }}
+                      </span>
+                    </div>
+                    <h3 class="text-sm font-medium text-gray-800 line-clamp-2 leading-snug dark:text-slate-200">{{ item.title }}</h3>
+                </div>
+              } @empty {
+                @if (!isLoading() && !errorMessage()) {
+                  <div class="text-center py-10 text-gray-400 text-sm dark:text-slate-500">Nenhuma história encontrada.</div>
+                }
+              }
+            </div>
+          </aside>
+
+          <!-- Main Content: Details -->
+          <main class="flex-1 p-6 bg-slate-50 overflow-hidden dark:bg-slate-900">
+            <div [class.hidden]="!selectedStory() && dailyTrigger() === 0" class="h-full">
+              <app-detail-view [workItem]="selectedStory()" [availableStories]="activeStories()" [triggerDaily]="dailyTrigger()" (closeDaily)="dailyTrigger.set(0)" class="h-full block" />
+            </div>
+
+            @if (!selectedStory() && dailyTrigger() === 0) {
+              <div class="h-full flex flex-col items-center justify-center text-gray-400 dark:text-slate-500">
+
+                <div class="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mb-4 text-gray-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                </div>
+                <p class="text-lg font-medium">Selecione uma User Story para ver os detalhes</p>
+                <p class="text-sm mt-2 max-w-xs text-center">Configure sua conexão nas Configurações para buscar dados reais do Azure DevOps.</p>
+              </div>
+            }
+          </main>
+        } @else {
+          <app-kanban-board [stories]="stories()" class="w-full h-full" />
+        }
       </div>
 
       <!-- Settings Modal -->
@@ -214,6 +228,7 @@ export class AppComponent {
   
   showSettings = signal(false);
   isSidebarOpen = signal(true);
+  viewMode = signal<'split' | 'board'>('split');
   dailyTrigger = signal<number>(0);
   isDarkMode = signal(this.loadTheme());
   stories = signal<WorkItem[]>([]);

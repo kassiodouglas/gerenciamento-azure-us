@@ -1,16 +1,25 @@
 import { Injectable } from '@angular/core';
 import { GoogleGenAI, Type } from "@google/genai";
 import { GeneratedTask } from '../types';
+import { GeminiConfigService } from '../app/core/config/gemini-config.service';
+import { inject } from '@angular/core';
 
 @Injectable({
   providedIn: 'root'
 })
 export class GeminiService {
-  private ai: GoogleGenAI;
+  private configService = inject(GeminiConfigService);
+  private _ai?: GoogleGenAI;
 
-  constructor() {
-    this.ai = new GoogleGenAI({ apiKey: process.env['API_KEY'] || '' });
+  private get ai(): GoogleGenAI {
+    const apiKey = this.configService.config().apiKey;
+    if (!this._ai || this._ai['apiKey'] !== apiKey) {
+      this._ai = new GoogleGenAI({ apiKey: apiKey });
+    }
+    return this._ai;
   }
+
+  constructor() {}
 
   async generateTasks(storyTitle: string, storyDescription: string): Promise<GeneratedTask[]> {
     const prompt = `
@@ -76,6 +85,9 @@ export class GeminiService {
   }
 
   async summarizeDescription(description: string): Promise<string> {
+    const apiKey = this.configService.config().apiKey;
+    if (!apiKey) return 'API Key do Gemini não configurada. Verifique as configurações.';
+
     const prompt = `
       Forneça um resumo executivo e conciso da seguinte User Story em português (PT-BR).
       Destaque o objetivo principal e os pontos chave.

@@ -1,38 +1,32 @@
-import { Injectable, signal, inject } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { AzureConfig, WorkItem, WiqlResponse } from '../types';
-import { map, catchError, of, Observable, forkJoin } from 'rxjs';
+import { WorkItem, WiqlResponse } from '../types';
+import { map, catchError, of, Observable } from 'rxjs';
+import { AzureConfigService, AzureConfig } from '../app/core/config/azure-config.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AzureService {
   private http = inject(HttpClient);
+  private azureConfig = inject(AzureConfigService);
   
-  config = signal<AzureConfig>(this.loadConfig());
-  
-  private loadConfig(): AzureConfig {
-    const stored = localStorage.getItem('azure_config');
-    return stored ? JSON.parse(stored) : { organization: '', project: '', pat: '', devEmail: '', isDemoMode: false };
-  }
+  config = this.azureConfig.config;
 
   saveConfig(newConfig: AzureConfig) {
-    localStorage.setItem('azure_config', JSON.stringify(newConfig));
-    this.config.set(newConfig);
+    this.azureConfig.saveConfig(newConfig);
   }
 
   private getHeaders(): HttpHeaders {
-    const conf = this.config();
-    const auth = btoa(':' + conf.pat);
+    const auth = this.azureConfig.getAuthorizationHeader();
     return new HttpHeaders({
       'Content-Type': 'application/json',
-      'Authorization': `Basic ${auth}`
+      'Authorization': auth
     });
   }
 
   private getBaseUrl(): string {
-    const conf = this.config();
-    return `https://dev.azure.com/${conf.organization}/${conf.project}/_apis/wit`;
+    return this.azureConfig.getBaseUrl();
   }
 
   // Fetch User Stories
@@ -118,6 +112,30 @@ export class AzureService {
         })
       );
     }
+
+  updateWorkItem(id: number, operations: { op: string, path: string, value: any }[]): Observable<WorkItem> {
+    if (this.config().isDemoMode) {
+      const story = this.getMockStories().find(s => s.id === id);
+      if (story) {
+        operations.forEach(op => {
+          const field = op.path.replace('/fields/', '');
+          (story.fields as any)[field] = op.value;
+        });
+        return of(story);
+      }
+      return of(this.getMockStories()[0]);
+    }
+
+    const url = `${this.getBaseUrl()}/workitems/${id}?api-version=7.0`;
+    const headers = this.getHeaders().set('Content-Type', 'application/json-patch+json');
+
+    return this.http.patch<WorkItem>(url, operations, { headers }).pipe(
+      catchError(err => {
+        console.error(`Update WorkItem ${id} Error`, err);
+        throw err;
+      })
+    );
+  }
 
   private getMockStories(): WorkItem[] {
     return [

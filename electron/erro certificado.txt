@@ -1,0 +1,4 @@
+npm install electron --save-dev
+
+erro certificado $ 
+export NODE_TLS_REJECT_UNAUTHORIZED=0
