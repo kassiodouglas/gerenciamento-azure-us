@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "ng serve",
+    "serve:dev": "ng serve",
     "build": "ng build",
     "preview": "ng serve --configuration=production"
   },

@@ -57,9 +57,9 @@ O **Azure DevOps AI Manager** é uma aplicação Angular moderna projetada para 
 
 4. **Executar o servidor de desenvolvimento:**
    ```bash
-   npm run dev
+   npm run serve:dev
    ```
-   A aplicação estará disponível em `http://localhost:4200` (ou na porta indicada no console).
+   A aplicação estará disponível em `http://localhost:3000` (ou na porta indicada no console).
 
 ## ⚙️ Configuração no App
 

@@ -125,11 +125,11 @@ export class AzureService {
         id: 101,
         rev: 1,
         fields: {
-          'System.Title': 'Integrate Google Gemini API',
+          'System.Title': 'Integrar API do Google Gemini',
           'System.WorkItemType': 'User Story',
-          'System.State': 'Active',
-          'System.Description': '<div>As a developer, I want to integrate the Gemini API so that I can generate AI responses.</div>',
-          'Microsoft.VSTS.Common.AcceptanceCriteria': '<div>- API Key is secured<br>- Response is parsed correctly</div>'
+          'System.State': 'Ativo',
+          'System.Description': '<div>Como desenvolvedor, eu quero integrar a API do Gemini para que eu possa gerar respostas de IA.</div>',
+          'Microsoft.VSTS.Common.AcceptanceCriteria': '<div>- Chave da API está segura<br>- Resposta é processada corretamente</div>'
         },
         relations: []
       },
@@ -137,20 +137,20 @@ export class AzureService {
         id: 102,
         rev: 1,
         fields: {
-          'System.Title': 'Design Dashboard UI',
+          'System.Title': 'Design da UI do Dashboard',
           'System.WorkItemType': 'User Story',
-          'System.State': 'New',
-          'System.Description': '<div>As a user, I want a clean dashboard to view my work items.</div>'
+          'System.State': 'Novo',
+          'System.Description': '<div>Como usuário, eu quero um dashboard limpo para visualizar meus itens de trabalho.</div>'
         }
       },
       {
         id: 103,
         rev: 1,
         fields: {
-          'System.Title': 'Implement Authentication',
+          'System.Title': 'Implementar Autenticação',
           'System.WorkItemType': 'User Story',
-          'System.State': 'Resolved',
-          'System.Description': '<div>Secure the app with OAuth2.</div>'
+          'System.State': 'Resolvido',
+          'System.Description': '<div>Proteger o app com OAuth2.</div>'
         }
       }
     ];

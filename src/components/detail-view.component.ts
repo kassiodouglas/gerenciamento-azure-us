@@ -1,15 +1,20 @@
-import { Component, input, signal, inject, computed, effect, Injector, HostListener } from '@angular/core';
+import { Component, input, signal, inject, computed, effect, Injector, HostListener, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { trigger, transition, style, animate } from '@angular/animations';
-import { WorkItem, GeneratedTask } from '../types';
+import { WorkItem as WorkItemType, GeneratedTask } from '../types';
+import { WorkItem as WorkItemEntity } from '../app/domains/work-item/domain/entities/work-item.entity';
 import { marked } from 'marked';
 import { GeminiService } from '../services/gemini.service';
 import { AzureService } from '../services/azure.service';
+import { ModalComponent } from './modal.component';
+
+type WorkItem = WorkItemType | WorkItemEntity;
 
 @Component({
   selector: 'app-detail-view',
-  imports: [CommonModule, FormsModule],
+  standalone: true,
+  imports: [CommonModule, FormsModule, ModalComponent],
   animations: [
     trigger('fadeInSlideIn', [
       transition(':enter, * => *', [
@@ -19,16 +24,16 @@ import { AzureService } from '../services/azure.service';
     ])
   ],
   template: `
-    <div [@fadeInSlideIn]="workItem().id" class="h-full flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden dark:bg-slate-800 dark:border-slate-700">
+    <div [@fadeInSlideIn]="workItem()?.id" class="h-full flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden dark:bg-slate-800 dark:border-slate-700">
       <!-- Header -->
       <div class="p-6 border-b border-gray-100 flex justify-between items-start dark:border-slate-700">
         <div class="flex-1">
           <div class="flex items-center gap-3 mb-2">
             <span class="px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
-              {{ workItem().fields['System.WorkItemType'] }} {{ workItem().id }}
+              {{ getField(workItem(), 'System.WorkItemType') }} {{ workItem()?.id }}
             </span>
-            <span [class]="'px-2 py-1 text-xs font-semibold rounded ' + getStateColor(workItem().fields['System.State'])">
-              {{ workItem().fields['System.State'] }}
+            <span [class]="'px-2 py-1 text-xs font-semibold rounded ' + getStateColor(getField(workItem(), 'System.State') || '')">
+              {{ getField(workItem(), 'System.State') }}
             </span>
             @if (totalHours() > 0 || totalEstimated() > 0) {
               <div class="flex items-center gap-1 px-2 py-1 text-xs font-bold rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
@@ -39,7 +44,7 @@ import { AzureService } from '../services/azure.service';
               </div>
             }
           </div>
-          <h1 class="text-2xl font-bold text-gray-900 leading-tight dark:text-slate-100">{{ workItem().fields['System.Title'] }}</h1>
+          <h1 class="text-2xl font-bold text-gray-900 leading-tight dark:text-slate-100">{{ getField(workItem(), 'System.Title') }}</h1>
           
           <div class="flex items-center gap-3 mt-4">
             <button (click)="generateBranchName()" class="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30">
@@ -73,7 +78,7 @@ import { AzureService } from '../services/azure.service';
             } @else {
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd" /></svg>
             }
-            AI Improve
+            Refinar IA
           </button>
         </div>
       </div>
@@ -86,7 +91,7 @@ import { AzureService } from '../services/azure.service';
           <section>
             <div class="flex items-center justify-between mb-4">
               <div class="flex items-center gap-2">
-                <button (click)="toggleUSContent()" class="p-1 hover:bg-gray-100 rounded dark:hover:bg-slate-700 transition-colors" [title]="isUSContentVisible() ? 'Hide US' : 'Show US'">
+                <button (click)="toggleUSContent()" class="p-1 hover:bg-gray-100 rounded dark:hover:bg-slate-700 transition-colors" [title]="isUSContentVisible() ? 'Esconder US' : 'Mostrar US'">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200" [class.rotate-180]="!isUSContentVisible()" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                   </svg>
@@ -97,17 +102,17 @@ import { AzureService } from '../services/azure.service';
             
             <div class="space-y-6" [class.hidden]="!isUSContentVisible()">
               <div>
-                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 dark:text-slate-400">Description</h4>
+                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 dark:text-slate-400">Descrição</h4>
                 <div class="prose prose-sm max-w-none text-gray-700 bg-gray-50 p-4 rounded-lg border border-gray-100 dark:bg-slate-900/50 dark:text-slate-300 dark:border-slate-700" 
-                     [innerHTML]="renderMarkdown(workItem().fields['System.Description'] || 'No description provided.')">
+                     [innerHTML]="renderMarkdown(getField(workItem(), 'System.Description') || 'Nenhuma descrição fornecida.')">
                 </div>
               </div>
 
-              @if (workItem().fields['Microsoft.VSTS.Common.AcceptanceCriteria']) {
+              @if (getField(workItem(), 'Microsoft.VSTS.Common.AcceptanceCriteria')) {
                 <div>
-                  <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 dark:text-slate-400">Acceptance Criteria</h4>
+                  <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 dark:text-slate-400">Critérios de Aceite</h4>
                   <div class="prose prose-sm max-w-none text-gray-700 bg-gray-50 p-4 rounded-lg border border-gray-100 dark:bg-slate-900/50 dark:text-slate-300 dark:border-slate-700"
-                       [innerHTML]="renderMarkdown(workItem().fields['Microsoft.VSTS.Common.AcceptanceCriteria'])">
+                       [innerHTML]="renderMarkdown(getField(workItem(), 'Microsoft.VSTS.Common.AcceptanceCriteria'))">
                   </div>
                 </div>
               }
@@ -122,12 +127,12 @@ import { AzureService } from '../services/azure.service';
           <section>
             <div class="flex items-center justify-between mb-4">
               <div class="flex items-center gap-2">
-                <button (click)="toggleRealTasks()" class="p-1 hover:bg-gray-100 rounded dark:hover:bg-slate-700 transition-colors" [title]="isRealTasksVisible() ? 'Esconder Tasks' : 'Mostrar Tasks'">
+                <button (click)="toggleRealTasks()" class="p-1 hover:bg-gray-100 rounded dark:hover:bg-slate-700 transition-colors" [title]="isRealTasksVisible() ? 'Esconder Tarefas' : 'Mostrar Tarefas'">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200" [class.rotate-180]="!isRealTasksVisible()" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                <h3 class="text-lg font-bold text-gray-900 dark:text-slate-100">Tasks</h3>
+                <h3 class="text-lg font-bold text-gray-900 dark:text-slate-100">Tarefas</h3>
               </div>
               <span class="px-2 py-0.5 text-xs font-bold bg-gray-200 text-gray-600 rounded-full dark:bg-slate-700 dark:text-slate-400">
                 {{ filteredTasks().length }}
@@ -151,28 +156,31 @@ import { AzureService } from '../services/azure.service';
               @if (filteredTasks().length > 0) {
               <div class="space-y-3">
                 @for (task of filteredTasks(); track task.id) {
-                  <div (click)="openTaskModal(task)" class="p-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-blue-300 transition-colors cursor-pointer group dark:bg-slate-800 dark:border-slate-700 dark:hover:border-blue-500">
+                  <div (click)="openTaskModal(task)" [class]="'p-3 border rounded-lg shadow-sm transition-colors cursor-pointer group dark:bg-slate-800 dark:border-slate-700 dark:hover:border-blue-500 ' + (getField(task, 'System.WorkItemType') === 'Bug' ? 'bg-red-50/30 border-red-100 hover:border-red-300' : 'bg-white border-gray-200 hover:border-blue-300')">
                     <div class="flex justify-between items-start mb-2">
                       <div class="flex items-center gap-2">
+                        <span [class]="'text-[9px] font-bold px-1 rounded uppercase ' + (getField(task, 'System.WorkItemType') === 'Bug' ? 'bg-red-600 text-white' : 'bg-slate-600 text-white')">
+                          {{ getField(task, 'System.WorkItemType') }}
+                        </span>
                         <span class="text-[10px] font-mono text-gray-500 dark:text-slate-500">#{{ task.id }}</span>
-                        @if (task.fields['Microsoft.VSTS.Scheduling.CompletedWork']) {
-                          <span class="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">{{ task.fields['Microsoft.VSTS.Scheduling.CompletedWork'] }}h</span>
+                        @if (getField(task, 'Microsoft.VSTS.Scheduling.CompletedWork')) {
+                          <span class="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">{{ getField(task, 'Microsoft.VSTS.Scheduling.CompletedWork') }}h</span>
                         }
                       </div>
-                      <span [class]="'text-[10px] uppercase font-bold px-1.5 rounded ' + getStateColor(task.fields['System.State'])">
-                        {{ task.fields['System.State'] }}
+                      <span [class]="'text-[10px] uppercase font-bold px-1.5 rounded ' + getStateColor(getField(task, 'System.State') || '')">
+                        {{ getField(task, 'System.State') }}
                       </span>
                     </div>
-                    <h4 class="text-sm font-semibold text-gray-900 leading-snug group-hover:text-blue-600 transition-colors dark:text-slate-100 dark:group-hover:text-blue-400">{{ task.fields['System.Title'] }}</h4>
-                    @if (task.fields['System.Description']) {
-                      <div class="text-[10px] text-gray-500 mt-1 line-clamp-1 dark:text-slate-400" [innerHTML]="renderMarkdown(task.fields['System.Description'])"></div>
+                    <h4 class="text-sm font-semibold text-gray-900 leading-snug group-hover:text-blue-600 transition-colors dark:text-slate-100 dark:group-hover:text-blue-400">{{ getField(task, 'System.Title') }}</h4>
+                    @if (getField(task, 'System.Description')) {
+                      <div class="text-[10px] text-gray-500 mt-1 line-clamp-1 dark:text-slate-400" [innerHTML]="renderMarkdown(getField(task, 'System.Description'))"></div>
                     }
                   </div>
                 }
               </div>
               } @else {
                 <div class="text-center py-6 px-4 bg-white border-2 border-dashed border-gray-200 rounded-lg dark:bg-slate-800/50 dark:border-slate-700">
-                  <p class="text-xs text-gray-400 dark:text-slate-500">No tasks created yet for this US.</p>
+                  <p class="text-xs text-gray-400 dark:text-slate-500">Nenhuma tarefa criada para esta US ainda.</p>
                 </div>
               }
             </div>
@@ -187,11 +195,11 @@ import { AzureService } from '../services/azure.service';
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider dark:text-slate-400">AI Suggestions</h3>
+                <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider dark:text-slate-400">Sugestões IA</h3>
               </div>
               <button (click)="generateTasks()" [disabled]="isGenerating()" 
                 class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition-colors disabled:opacity-50 dark:text-blue-400 dark:hover:bg-blue-900/30"
-                title="Generate suggestions">
+                title="Gerar sugestões">
                 @if (isGenerating()) {
                   <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 } @else {
@@ -232,182 +240,164 @@ import { AzureService } from '../services/azure.service';
 
       <!-- AI Summary Modal -->
       @if (summaryContent()) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" (click)="summaryContent.set('')">
-          <div class="bg-white dark:bg-slate-800 w-full max-w-lg rounded-xl shadow-2xl overflow-hidden" (click)="$event.stopPropagation()">
-            <div class="p-6 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/20">
-              <h2 class="text-lg font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Resumo IA
-              </h2>
-              <button (click)="summaryContent.set('')" class="text-indigo-400 hover:text-indigo-600">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <div class="p-8">
-              <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-slate-300 whitespace-pre-line">
-                {{ summaryContent() }}
-              </div>
-            </div>
-            <div class="p-6 bg-slate-50 dark:bg-slate-900/40 border-t border-gray-100 dark:border-slate-700 text-right">
-              <button (click)="summaryContent.set('')" class="px-6 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors">Fechar</button>
-            </div>
+        <app-modal title="Resumo IA" 
+                   maxWidth="max-w-lg"
+                   headerClass="bg-indigo-50 dark:bg-indigo-900/20"
+                   titleClass="text-indigo-900 dark:text-indigo-300"
+                   (close)="summaryContent.set('')">
+          
+          <svg header-icon xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+
+          <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-slate-300 whitespace-pre-line">
+            {{ summaryContent() }}
           </div>
-        </div>
+
+          <div footer class="text-right">
+            <button (click)="summaryContent.set('')" class="px-6 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors">Fechar</button>
+          </div>
+        </app-modal>
       }
 
       <!-- Daily Modal -->
       @if (showDailyModal()) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" (click)="showDailyModal.set(false)">
-          <div class="bg-white dark:bg-slate-800 w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden" (click)="$event.stopPropagation()">
-            <div class="p-6 border-b border-gray-100 dark:border-slate-700 bg-blue-50 dark:bg-blue-900/20 flex justify-between items-center">
-              <h2 class="text-lg font-bold text-blue-900 dark:text-blue-300 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                Gerar Relatório Daily
-              </h2>
-              <button (click)="showDailyModal.set(false)" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
+        <app-modal title="Gerar Relatório Daily"
+                   maxWidth="max-w-2xl"
+                   [fullHeight]="true"
+                   headerClass="bg-blue-50 dark:bg-blue-900/20"
+                   titleClass="text-blue-900 dark:text-blue-300"
+                   (close)="showDailyModal.set(false); closeDaily.emit()">
+          
+          <svg header-icon xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+
+          <div class="space-y-6">
+            <div>
+              <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Selecione a US</label>
+              <select [ngModel]="dailyUSId()" (ngModelChange)="onUSChange($event)" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white">
+                @for (us of filteredDailyStories(); track us.id) {
+                  <option [value]="us.id">#{{ us.id }} - {{ getField(us, 'System.Title') }}</option>
+                }
+              </select>
             </div>
-            <div class="p-8 space-y-6 overflow-y-auto max-h-[70vh]">
-              
-              <div>
-                <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Selecione a US</label>
-                <select [ngModel]="dailyUSId()" (ngModelChange)="onUSChange($event)" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white">
-                  @for (us of availableStories(); track us.id) {
-                    <option [value]="us.id">#{{ us.id }} - {{ us.fields['System.Title'] }}</option>
-                  }
-                </select>
-              </div>
 
-              <div class="grid grid-cols-2 gap-4">
-                <div class="bg-gray-50 dark:bg-slate-900 p-4 rounded-lg border border-gray-100 dark:border-slate-700">
-                  <span class="block text-[10px] text-gray-500 uppercase font-bold mb-1">Real Acumulado</span>
-                  <span class="text-xl font-bold text-indigo-600">
-                    {{ getSelectedUSHours() }}h
-                  </span>
-                </div>
-                <div class="bg-gray-50 dark:bg-slate-900 p-4 rounded-lg border border-gray-100 dark:border-slate-700">
-                  <span class="block text-[10px] text-gray-500 uppercase font-bold mb-1">Estimado Story Points</span>
-                  <span class="text-xl font-bold text-amber-600">
-                    {{ getSelectedUSEstimatedPoints() }} pts
-                  </span>
-                </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="bg-gray-50 dark:bg-slate-900 p-4 rounded-lg border border-gray-100 dark:border-slate-700">
+                <span class="block text-[10px] text-gray-500 uppercase font-bold mb-1">Real Acumulado</span>
+                <span class="text-xl font-bold text-indigo-600">
+                  {{ getSelectedUSHours() }}h
+                </span>
               </div>
-
-              <div class="grid grid-cols-3 gap-4">
-                <div class="col-span-1">
-                  <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Horas Hoje</label>
-                  <input type="number" [(ngModel)]="dailyHoursToday" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white" />
-                </div>
-                <div class="col-span-2">
-                  <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Observações</label>
-                  <textarea [(ngModel)]="dailyNotes" rows="1" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white resize-none" placeholder="O que foi feito..."></textarea>
-                </div>
+              <div class="bg-gray-50 dark:bg-slate-900 p-4 rounded-lg border border-gray-100 dark:border-slate-700">
+                <span class="block text-[10px] text-gray-500 uppercase font-bold mb-1">Estimado Story Points</span>
+                <span class="text-xl font-bold text-amber-600">
+                  {{ getSelectedUSEstimatedPoints() }} pts
+                </span>
               </div>
+            </div>
 
-              <div>
-                <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Pendências ou Bloqueios</label>
-                <textarea [(ngModel)]="dailyPending" rows="2" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white resize-none" placeholder="Informe aqui se houver pendências..."></textarea>
+            <div class="grid grid-cols-3 gap-4">
+              <div class="col-span-1">
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Horas Hoje</label>
+                <input type="number" [(ngModel)]="dailyHoursToday" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white" />
               </div>
-
-              <div class="flex justify-center">
-                <button (click)="addDemand()" [disabled]="!dailyHoursToday" class="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-full text-xs font-bold transition-all dark:bg-indigo-900/20 dark:text-indigo-400">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                  PRÓXIMA DEMANDA
-                </button>
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Observações</label>
+                <textarea [(ngModel)]="dailyNotes" rows="1" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white resize-none" placeholder="O que foi feito..."></textarea>
               </div>
+            </div>
 
-              <div class="bg-slate-900 text-blue-400 p-4 rounded-lg font-mono text-xs whitespace-pre-wrap border border-blue-900/50">
+            <div>
+              <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Pendências ou Bloqueios</label>
+              <textarea [(ngModel)]="dailyPending" rows="2" class="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white resize-none" placeholder="Informe aqui se houver pendências..."></textarea>
+            </div>
+
+            <div class="bg-slate-900 text-blue-400 p-4 rounded-lg font-mono text-xs whitespace-pre-wrap border border-blue-900/50">
 {{ getDailyPreview() }}
-              </div>
             </div>
-            <div class="p-6 bg-slate-50 dark:bg-slate-900/40 border-t border-gray-100 dark:border-slate-700 flex justify-end gap-3">
-              <button (click)="showDailyModal.set(false)" class="px-6 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 dark:text-slate-400">Fechar</button>
+          </div>
+
+          <div footer class="flex justify-between items-center gap-3">
+            <button (click)="addDemand()" [disabled]="!dailyHoursToday" class="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-full text-xs font-bold transition-all dark:bg-indigo-900/20 dark:text-indigo-400">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+              PRÓXIMA DEMANDA
+            </button>
+            <div class="flex gap-3">
+              <button (click)="showDailyModal.set(false); closeDaily.emit()" class="px-6 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 dark:text-slate-400">Fechar</button>
               <button (click)="copyDaily()" class="px-6 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-lg shadow-blue-500/20">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
                 Gerar Relatório Daily
               </button>
             </div>
           </div>
-        </div>
+        </app-modal>
       }
 
       <!-- Task Modal -->
       @if (selectedTask()) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300" (click)="closeTaskModal()">
-          <div class="bg-white dark:bg-slate-800 w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden transform transition-all duration-300 scale-100 opacity-100" 
-               (click)="$event.stopPropagation()">
-            <!-- Modal Header -->
-            <div class="p-6 border-b border-gray-100 dark:border-slate-700 flex justify-between items-start bg-slate-50/50 dark:bg-slate-900/20">
+        <app-modal [title]="getField(selectedTask()!, 'System.Title')"
+                   maxWidth="max-w-2xl"
+                   headerClass="bg-slate-50/50 dark:bg-slate-900/20"
+                   (close)="closeTaskModal()">
+          
+          <div header-icon class="flex items-center gap-3">
+            <span class="px-2 py-1 text-[10px] font-bold rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">TASK #{{ selectedTask()!.id }}</span>
+            <span [class]="'px-2 py-1 text-[10px] font-bold rounded ' + getStateColor(getField(selectedTask()!, 'System.State') || '')">
+              {{ getField(selectedTask()!, 'System.State') }}
+            </span>
+          </div>
+
+          <div class="space-y-8">
+            @if (getField(selectedTask()!, 'System.Description')) {
               <div>
-                <div class="flex items-center gap-3 mb-2">
-                  <span class="px-2 py-1 text-[10px] font-bold rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">TASK #{{ selectedTask()!.id }}</span>
-                  <span [class]="'px-2 py-1 text-[10px] font-bold rounded ' + getStateColor(selectedTask()!.fields['System.State'])">
-                    {{ selectedTask()!.fields['System.State'] }}
-                  </span>
-                </div>
-                <h2 class="text-xl font-bold text-gray-900 dark:text-slate-100">{{ selectedTask()!.fields['System.Title'] }}</h2>
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Descrição</h3>
+                <div class="prose prose-sm max-w-none text-gray-700 dark:text-slate-300" [innerHTML]="renderMarkdown(getField(selectedTask()!, 'System.Description'))"></div>
               </div>
-              <button (click)="closeTaskModal()" class="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full transition-colors text-gray-400">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+            }
 
-            <!-- Modal Body -->
-            <div class="p-8 overflow-y-auto max-h-[70vh] space-y-8">
-              @if (selectedTask()!.fields['System.Description']) {
-                <div>
-                  <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Description</h3>
-                  <div class="prose prose-sm max-w-none text-gray-700 dark:text-slate-300" [innerHTML]="renderMarkdown(selectedTask()!.fields['System.Description'])"></div>
-                </div>
-              }
-
-              <div class="grid grid-cols-2 gap-6 pt-6 border-t border-gray-100 dark:border-slate-700">
-                <div>
-                  <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Effort</h3>
-                  <div class="flex items-center gap-4">
-                    <div class="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-gray-100 dark:border-slate-700 flex-1">
-                      <span class="block text-[10px] text-gray-500 uppercase">Completed</span>
-                      <span class="text-lg font-bold text-indigo-600 dark:text-indigo-400">{{ selectedTask()!.fields['Microsoft.VSTS.Scheduling.CompletedWork'] || 0 }}h</span>
-                    </div>
-                    <div class="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-gray-100 dark:border-slate-700 flex-1">
-                      <span class="block text-[10px] text-gray-500 uppercase">Remaining</span>
-                      <span class="text-lg font-bold text-amber-600 dark:text-amber-400">{{ selectedTask()!.fields['Microsoft.VSTS.Scheduling.RemainingWork'] || 0 }}h</span>
-                    </div>
+            <div class="grid grid-cols-2 gap-6 pt-6 border-t border-gray-100 dark:border-slate-700">
+              <div>
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Esforço</h3>
+                <div class="flex items-center gap-4">
+                  <div class="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-gray-100 dark:border-slate-700 flex-1">
+                    <span class="block text-[10px] text-gray-500 uppercase">Concluído</span>
+                    <span class="text-lg font-bold text-indigo-600 dark:text-indigo-400">{{ getField(selectedTask()!, 'Microsoft.VSTS.Scheduling.CompletedWork') || 0 }}h</span>
                   </div>
-                </div>
-                <div>
-                  <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Assigned To</h3>
-                  <div class="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-gray-100 dark:border-slate-700">
-                    <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs">
-                      {{ (selectedTask()!.fields['System.AssignedTo']?.displayName || '?')[0] }}
-                    </div>
-                    <span class="text-sm font-medium text-gray-700 dark:text-slate-200">{{ selectedTask()!.fields['System.AssignedTo']?.displayName || 'Unassigned' }}</span>
+                  <div class="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-gray-100 dark:border-slate-700 flex-1">
+                    <span class="block text-[10px] text-gray-500 uppercase">Restante</span>
+                    <span class="text-lg font-bold text-amber-600 dark:text-amber-400">{{ getField(selectedTask()!, 'Microsoft.VSTS.Scheduling.RemainingWork') || 0 }}h</span>
                   </div>
                 </div>
               </div>
-            </div>
-            
-            <!-- Modal Footer -->
-            <div class="p-6 bg-slate-50 dark:bg-slate-900/40 border-t border-gray-100 dark:border-slate-700 text-right">
-              <button (click)="closeTaskModal()" class="px-6 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 text-sm font-bold text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
-                Close
-              </button>
+              <div>
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Atribuído a</h3>
+                <div class="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-gray-100 dark:border-slate-700">
+                  <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs">
+                    {{ (getField(selectedTask()!, 'System.AssignedTo')?.displayName || '?')[0] }}
+                  </div>
+                  <span class="text-sm font-medium text-gray-700 dark:text-slate-200">{{ getField(selectedTask()!, 'System.AssignedTo')?.displayName || 'Não atribuído' }}</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+
+          <div footer class="text-right">
+            <button (click)="closeTaskModal()" class="px-6 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 text-sm font-bold text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+              Fechar
+            </button>
+          </div>
+        </app-modal>
       }
     </div>
   `
 })
 export class DetailViewComponent {
-  workItem = input.required<WorkItem>();
+  workItem = input.required<WorkItem | null>();
   availableStories = input<WorkItem[]>([]);
   triggerDaily = input<number>(0);
+  closeDaily = output<void>();
   
   private azure = inject(AzureService);
   private injector = inject(Injector);
@@ -441,43 +431,61 @@ export class DetailViewComponent {
   dailyNotes = '';
   dailyPending = '';
   dailyUSId = signal<number>(0);
+  dailyUSHours = signal<number>(0);
   dailyReports = signal<{ us: WorkItem, hours: number, notes: string }[]>([]);
 
-  taskStatusFilters = signal<string[]>(['em desenvolvimento', 'testes', 'revisão', 'para fazer', 'novo', 'ativo']);
-  taskStatusOptions = ['para fazer', 'em desenvolvimento', 'revisão', 'testes', 'resolvido', 'fechado', 'novo', 'ativo'];
+  filteredDailyStories = computed(() => {
+    return this.availableStories().filter(us => {
+      const state = (this.getField(us, 'System.State') || '').toLowerCase();
+      return state === 'new' || 
+             state === 'to do' || 
+             state === 'para fazer' || 
+             state === 'novo' ||
+             state === 'active' || 
+             state === 'in progress' || 
+             state === 'em desenvolvimento' ||
+             state === 'review' || 
+             state === 'revisão';
+    });
+  });
+
+  taskStatusFilters = signal<string[]>(['novo', 'em desenvolvimento', 'testes', 'revisão']);
+  taskStatusOptions = ['novo', 'em desenvolvimento', 'testes', 'revisão', 'fechado'];
 
   filteredTasks = computed(() => {
     const filters = this.taskStatusFilters();
     if (filters.length === 0) return this.realTasks();
 
     return this.realTasks().filter(task => {
-      const state = task.fields['System.State'].toLowerCase();
+      const state = (this.getField(task, 'System.State') || '').toLowerCase();
+      
       return filters.some(f => {
-        if (f === 'para fazer') return state === 'new' || state === 'to do' || state === 'para fazer';
+        if (f === 'novo') return state === 'new' || state === 'to do' || state === 'para fazer' || state === 'novo';
         if (f === 'em desenvolvimento') return state === 'active' || state === 'in progress' || state === 'em desenvolvimento';
         if (f === 'revisão') return state === 'review' || state === 'revisão';
         if (f === 'testes') return state === 'testing' || state === 'testes';
         if (f === 'resolvido') return state === 'resolved' || state === 'resolvido';
         if (f === 'fechado') return state === 'closed' || state === 'fechado';
-        if (f === 'novo') return state === 'new';
-        if (f === 'ativo') return state === 'active' || state === 'in progress';
         return state === f;
       });
     });
   });
 
   totalHours = computed(() => {
-    return this.realTasks().reduce((acc, t) => acc + (t.fields['Microsoft.VSTS.Scheduling.CompletedWork'] || 0), 0);
+    return this.realTasks().reduce((acc, t) => acc + (this.getField(t, 'Microsoft.VSTS.Scheduling.CompletedWork') || 0), 0);
   });
 
   totalEstimated = computed(() => {
-    return this.workItem().fields['Microsoft.VSTS.Scheduling.StoryPoints'] || this.workItem().fields['Microsoft.VSTS.Scheduling.Effort'] || 0;
+    const wi = this.workItem();
+    if (!wi) return 0;
+    return this.getField(wi, 'Microsoft.VSTS.Scheduling.StoryPoints') || this.getField(wi, 'Microsoft.VSTS.Scheduling.Effort') || 0;
   });
 
   // Reset local state when workItem changes
   constructor() {
     effect(() => {
       const wi = this.workItem();
+      if (!wi) return;
       this.tasks.set([]); 
       this.isGenerating.set(false);
       this.isRefining.set(false);
@@ -486,7 +494,8 @@ export class DetailViewComponent {
     });
 
     effect(() => {
-      if (this.triggerDaily() > 0) {
+      const trigger = this.triggerDaily();
+      if (trigger > 0) {
         this.openDailyModal();
       }
     });
@@ -526,15 +535,13 @@ export class DetailViewComponent {
   }
 
   refreshDetails() {
+    const wi = this.workItem();
+    if (!wi) return;
     this.isRefreshingDetails.set(true);
-    // Passamos um header para o interceptor ignorar o cache
-    this.azure.getWorkItem(this.workItem().id, true).subscribe({
+    this.azure.getWorkItem(wi.id, true).subscribe({
       next: (fullItem) => {
-        // Atualizar o item localmente. Como workItem é um input, 
-        // o ideal seria emitir um evento para o pai atualizar, 
-        // mas para simplificar e garantir a atualização da UI:
-        Object.assign(this.workItem(), fullItem);
-        this.loadRealTasks(fullItem);
+        Object.assign(wi, fullItem);
+        this.loadRealTasks(fullItem as any);
         this.isRefreshingDetails.set(false);
         this.showToast('Dados atualizados!');
       },
@@ -546,7 +553,9 @@ export class DetailViewComponent {
   }
 
   async generateSummary() {
-    const desc = this.workItem().fields['System.Description']?.replace(/<[^>]*>/g, '') || '';
+    const wi = this.workItem();
+    if (!wi) return;
+    const desc = (this.getField(wi, 'System.Description') || '').replace(/<[^>]*>/g, '') || '';
     if (!desc) return;
     
     this.isGeneratingSummary.set(true);
@@ -557,8 +566,9 @@ export class DetailViewComponent {
 
   generateBranchName() {
     const wi = this.workItem();
+    if (!wi) return;
     const id = wi.id;
-    const title = wi.fields['System.Title'];
+    const title = this.getField(wi, 'System.Title') || '';
     
     const cleanTitle = title
       .toLowerCase()
@@ -576,42 +586,84 @@ export class DetailViewComponent {
   }
 
   openDailyModal() {
+    const wi = this.workItem();
     this.dailyHoursToday = 0;
     this.dailyNotes = '';
     this.dailyPending = '';
-    this.dailyUSId.set(this.workItem().id);
+    const initialId = wi?.id || (this.availableStories().length > 0 ? this.availableStories()[0].id : 0);
+    this.dailyUSId.set(initialId);
     this.dailyReports.set([]);
+    
+    if (initialId === wi?.id) {
+      this.dailyUSHours.set(this.totalHours());
+    } else {
+      const us = this.availableStories().find(s => s.id === initialId);
+      if (us) this.loadUSHours(us);
+    }
+    
     this.showDailyModal.set(true);
   }
 
   onUSChange(newId: any) {
-    this.dailyUSId.set(+newId);
+    const id = +newId;
+    this.dailyUSId.set(id);
     this.dailyHoursToday = 0;
     this.dailyNotes = '';
+    
+    // Carregar horas se não for a US atual
+    const currentId = this.workItem()?.id;
+    if (id === currentId) {
+      this.dailyUSHours.set(this.totalHours());
+    } else {
+      const us = this.availableStories().find(s => s.id === id);
+      if (us) {
+        this.loadUSHours(us);
+      }
+    }
+  }
+
+  private loadUSHours(us: WorkItem) {
+    const relations = (us as WorkItemType).relations || (us as WorkItemEntity).relations || [];
+    const taskIds = relations
+      ?.filter(rel => rel.rel === 'System.LinkTypes.Hierarchy-Forward' || rel.url.includes('/workItems/'))
+      .map(rel => {
+        const parts = rel.url.split('/');
+        return parseInt(parts[parts.length - 1], 10);
+      })
+      .filter(id => !isNaN(id)) || [];
+
+    if (taskIds.length > 0) {
+      this.azure.getWorkItemsByIds(taskIds).subscribe(items => {
+        const total = items
+          .filter(i => this.getField(i, 'System.WorkItemType') === 'Task' || this.getField(i, 'System.WorkItemType') === 'Bug')
+          .reduce((acc, t) => acc + (this.getField(t, 'Microsoft.VSTS.Scheduling.CompletedWork') || 0), 0);
+        this.dailyUSHours.set(total);
+      });
+    } else {
+      this.dailyUSHours.set(0);
+    }
   }
 
   getSelectedUSHours(): number {
-    const currentId = this.workItem().id;
-    const selectedId = Number(this.dailyUSId());
-    if (selectedId === currentId) {
-      return this.totalHours();
-    }
-    const us = this.availableStories().find(s => s.id === selectedId);
-    return us?.fields['Microsoft.VSTS.Scheduling.CompletedWork'] || 0;
+    return this.dailyUSHours();
   }
 
   getSelectedUSEstimatedPoints(): number {
-    const currentId = this.workItem().id;
+    const currentId = this.workItem()?.id;
     const selectedId = Number(this.dailyUSId());
-    const us = this.availableStories().find(s => s.id === selectedId);
+    const us = (selectedId === currentId) ? this.workItem() : this.availableStories().find(s => s.id === selectedId);
+    
     if (us) {
-      return us.fields['Microsoft.VSTS.Scheduling.StoryPoints'] || 0;
+      return this.getField(us, 'Microsoft.VSTS.Scheduling.StoryPoints') || 
+             this.getField(us, 'Microsoft.VSTS.Scheduling.Effort') || 
+             0;
     }
-    return this.workItem().fields['Microsoft.VSTS.Scheduling.StoryPoints'] || 0;
+    return 0;
   }
 
   addDemand() {
     const us = this.availableStories().find(s => s.id === Number(this.dailyUSId())) || this.workItem();
+    if (!us) return;
     this.dailyReports.update(reports => [...reports, {
       us,
       hours: this.dailyHoursToday,
@@ -627,12 +679,14 @@ export class DetailViewComponent {
     const footer = `\n\n#### Pendências ou Bloqueios:\n${this.dailyPending || 'Nenhuma.'}`;
 
     const currentUS = this.availableStories().find(s => s.id === Number(this.dailyUSId())) || this.workItem();
-    const currentPreview = `#US ${currentUS.id} - ${currentUS.fields['System.Title']}\nReal/ Est /Variação: ${this.getUSRealHours(currentUS)}h / ${this.getUSEstimatedHours(currentUS)}h +${this.dailyHoursToday}h\nObservações: ${this.dailyNotes}`;
+    if (!currentUS) return '';
+    
+    const currentPreview = `#US ${currentUS.id} - ${this.getField(currentUS, 'System.Title')}\nReal/ Est /Variação: ${this.getUSRealHours(currentUS)}h / ${this.getUSEstimatedHours(currentUS)}h +${this.dailyHoursToday}h\nObservações: ${this.dailyNotes}`;
 
     let content = '';
     if (this.dailyReports().length > 0) {
       const historical = this.dailyReports().map(r => {
-        return `#US ${r.us.id} - ${r.us.fields['System.Title']}\nReal/ Est /Variação: ${this.getUSRealHours(r.us)}h / ${this.getUSEstimatedHours(r.us)}h +${r.hours}h\nObservações: ${r.notes}`;
+        return `#US ${r.us.id} - ${this.getField(r.us, 'System.Title')}\nReal/ Est /Variação: ${this.getUSRealHours(r.us)}h / ${this.getUSEstimatedHours(r.us)}h +${r.hours}h\nObservações: ${r.notes}`;
       }).join('\n\n');
       content = `${historical}\n\n${currentPreview}`;
     } else {
@@ -643,12 +697,13 @@ export class DetailViewComponent {
   }
 
   private getUSRealHours(us: WorkItem): number {
-    if (us.id === this.workItem().id) return this.totalHours();
-    return us.fields['Microsoft.VSTS.Scheduling.CompletedWork'] || 0;
+    const wi = this.workItem();
+    if (wi && us.id === wi.id) return this.totalHours();
+    return this.getField(us, 'Microsoft.VSTS.Scheduling.CompletedWork') || 0;
   }
 
   private getUSEstimatedHours(us: WorkItem): number {
-    return us.fields['Custom.StoryPointsHours'] || us.fields['Microsoft.VSTS.Scheduling.Effort'] || 0;
+    return this.getField(us, 'Custom.StoryPointsHours') || this.getField(us, 'Microsoft.VSTS.Scheduling.Effort') || 0;
   }
 
   copyDaily() {
@@ -675,7 +730,9 @@ export class DetailViewComponent {
 
   private loadRealTasks(wi: WorkItem) {
     this.realTasks.set([]);
-    const taskIds = wi.relations
+    if (!wi) return;
+    const relations = (wi as WorkItemType).relations || (wi as WorkItemEntity).relations || [];
+    const taskIds = relations
       ?.filter(rel => rel.rel === 'System.LinkTypes.Hierarchy-Forward' || rel.url.includes('/workItems/'))
       .map(rel => {
         const parts = rel.url.split('/');
@@ -685,10 +742,10 @@ export class DetailViewComponent {
 
     if (taskIds.length > 0) {
       this.azure.getWorkItemsByIds(taskIds).subscribe(items => {
-        const onlyTasks = items
-          .filter(i => i.fields['System.WorkItemType'] === 'Task')
+        const itemsList = items
+          .filter(i => this.getField(i, 'System.WorkItemType') === 'Task' || this.getField(i, 'System.WorkItemType') === 'Bug')
           .sort((a, b) => a.id - b.id);
-        this.realTasks.set(onlyTasks);
+        this.realTasks.set(itemsList as any);
       });
     }
   }
@@ -696,9 +753,10 @@ export class DetailViewComponent {
   async generateTasks() {
     this.isGenerating.set(true);
     const wi = this.workItem();
-    const desc = wi.fields['System.Description']?.replace(/<[^>]*>/g, '') || '';
+    if (!wi) return;
+    const desc = (this.getField(wi, 'System.Description') || '').replace(/<[^>]*>/g, '') || '';
     
-    const suggested = await this.gemini.generateTasks(wi.fields['System.Title'], desc);
+    const suggested = await this.gemini.generateTasks(this.getField(wi, 'System.Title') || '', desc);
     this.tasks.set(suggested);
     this.isGenerating.set(false);
   }
@@ -706,15 +764,46 @@ export class DetailViewComponent {
   async refineStory() {
     this.isRefining.set(true);
     const wi = this.workItem();
-    const desc = wi.fields['System.Description']?.replace(/<[^>]*>/g, '') || '';
+    if (!wi) {
+      this.isRefining.set(false);
+      return;
+    }
+    const desc = (this.getField(wi, 'System.Description') || '').replace(/<[^>]*>/g, '') || '';
     const improved = await this.gemini.refineDescription(desc);
     
-    wi.fields['System.Description'] = improved.replace(/\n/g, '<br>');
+    if ('fields' in wi) {
+      wi.fields['System.Description'] = improved.replace(/\n/g, '<br>');
+    } else {
+      (wi as WorkItemEntity).description = improved.replace(/\n/g, '<br>');
+    }
     this.isRefining.set(false);
   }
 
+  getField(wi: WorkItem | null | undefined, fieldName: string): any {
+    if (!wi) return null;
+    if ('fields' in wi) {
+      return wi.fields[fieldName];
+    }
+    // Mapeamento manual para WorkItemEntity
+    const entity = wi as WorkItemEntity;
+    switch (fieldName) {
+      case 'System.Title': return entity.title;
+      case 'System.WorkItemType': return entity.type;
+      case 'System.State': return entity.state;
+      case 'System.Description': return entity.description;
+      case 'Microsoft.VSTS.Common.AcceptanceCriteria': return entity.acceptanceCriteria;
+      case 'Microsoft.VSTS.Scheduling.StoryPoints': 
+      case 'Microsoft.VSTS.Scheduling.Effort':
+      case 'Custom.StoryPointsHours':
+        return (entity as any).storyPoints || (entity as any).effort || 0;
+      case 'Microsoft.VSTS.Scheduling.CompletedWork': return (entity as any).completedWork || 0;
+      case 'Microsoft.VSTS.Scheduling.RemainingWork': return (entity as any).remainingWork || 0;
+      default: return null;
+    }
+  }
+
   getStateColor(state: string): string {
-    const s = state.toLowerCase();
+    const s = (state || '').toLowerCase();
     if (s === 'closed' || s === 'fechado') return 'bg-green-800 text-green-100 dark:bg-green-900 dark:text-green-200';
     if (s === 'testes' || s === 'testing' || s === 'resolved') return 'bg-yellow-400 text-yellow-900 dark:bg-yellow-600 dark:text-yellow-100';
     if (s === 'para fazer' || s === 'to do' || s === 'new') return 'bg-green-500 text-white dark:bg-green-700 dark:text-green-100';

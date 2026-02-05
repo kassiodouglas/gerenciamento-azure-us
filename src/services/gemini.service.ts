@@ -14,12 +14,13 @@ export class GeminiService {
 
   async generateTasks(storyTitle: string, storyDescription: string): Promise<GeneratedTask[]> {
     const prompt = `
-      You are an expert Agile Developer.
-      User Story Title: ${storyTitle}
-      Description: ${storyDescription}
+      Você é um Desenvolvedor Agile especialista.
+      Título da User Story: ${storyTitle}
+      Descrição: ${storyDescription}
       
-      Please suggest 3 to 5 distinct technical sub-tasks required to complete this User Story.
-      Focus on coding, testing, and configuration tasks.
+      Por favor, sugira de 3 a 5 sub-tarefas técnicas distintas necessárias para completar esta User Story.
+      Responda em Português (PT-BR).
+      Foque em tarefas de codificação, testes e configuração.
     `;
 
     try {
@@ -33,9 +34,9 @@ export class GeminiService {
             items: {
               type: Type.OBJECT,
               properties: {
-                title: { type: Type.STRING, description: "Title of the task" },
-                description: { type: Type.STRING, description: "Brief description of what needs to be done" },
-                activity: { type: Type.STRING, description: "Type of activity e.g. Development, Design, Testing" }
+                title: { type: Type.STRING, description: "Título da tarefa" },
+                description: { type: Type.STRING, description: "Breve descrição do que precisa ser feito" },
+                activity: { type: Type.STRING, description: "Tipo de atividade, ex: Desenvolvimento, Design, Testes" }
               },
               required: ["title", "description"]
             }
@@ -54,10 +55,11 @@ export class GeminiService {
 
   async refineDescription(currentDesc: string): Promise<string> {
     const prompt = `
-      Refine the following User Story description to be more professional, clear, and follow standard "As a... I want... So that..." format if possible.
-      Keep HTML tags if present or return plain text with markdown.
+      Refine a seguinte descrição de User Story para ser mais profissional, clara e seguir o formato padrão "Como um... eu quero... para que..." se possível.
+      Responda em Português (PT-BR).
+      Mantenha as tags HTML se presentes ou retorne texto simples com markdown.
       
-      Current Description:
+      Descrição Atual:
       ${currentDesc}
     `;
 
