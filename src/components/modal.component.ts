@@ -29,7 +29,7 @@ import { trigger, transition, style, animate } from '@angular/animations';
   template: `
     <div [@backdropAnim] class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" (click)="close.emit()">
       <div [@modalAnim] 
-           [class]="'bg-white dark:bg-slate-800 rounded-xl shadow-2xl overflow-hidden flex flex-col ' + maxWidth() + (fullHeight() ? ' h-full max-h-[calc(100vh-2rem)]' : '')" 
+           [class]="'bg-white dark:bg-slate-800 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-full ' + maxWidth() + (fullHeight() ? ' h-full' : '')" 
            (click)="$event.stopPropagation()">
         
         <!-- Header -->
